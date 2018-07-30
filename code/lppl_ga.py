@@ -10,8 +10,6 @@ from pandas import Series, DataFrame
 import datetime
 import itertools
 from sklearn.metrics import mean_squared_error
-#sz = pdr.get_data_yahoo('159915.SZ', start=datetime.datetime(2014, 1, 1),end=datetime.datetime(2015, 6, 10))
-# print( sz)
 
 #Nasdaq
 # daily_data = pd.read_csv( "Data/Stock/NASDAQCOM.csv", sep=',', index_col = 0, names=['Close'], header=None )
@@ -25,13 +23,14 @@ from sklearn.metrics import mean_squared_error
 # time = np.linspace(0, len(sz)-1, len(sz))
 # close = [sz.Close[i] for i in range(len(sz.Close))]
 # print(sz.Close.describe() )
+
 # BTC
 daily_data = pd.read_csv( "Data/cmc/daily.csv", sep='\t', parse_dates=['Date'], index_col='Date', 
                             names=[ 'Date', 'Open', 'High', 'Low', 'PirceClose', 'Volume', 'MarketCap'],
                             header=0)
 
-daily_data = daily_data.loc[daily_data.index >= '2017-01-01 00:00:00']
-daily_data = daily_data.loc[daily_data.index <= '2017-12-15 00:00:00']
+daily_data = daily_data.loc[daily_data.index <= '2015-10-24 00:00:00'] #Max
+daily_data = daily_data.loc[daily_data.index >= '2015-09-01 00:00:00'] #Min
 
 daily_data['Open'] = daily_data['Open'].apply(lambda x: float( x.replace(',','') ) )
 daily_data['High'] = daily_data['High'].apply(lambda x: float( x.replace(',','') ) )
@@ -189,7 +188,7 @@ class Population:
         counter = 0
         false = 0
         for individual in list(self.populous):
-            print('Fitness Evaluating: ' + str(counter) +  " of " + str(len(self.populous)) + "        \r"),
+            #print('Fitness Evaluating: ' + str(counter) +  " of " + str(len(self.populous)) + "        \r"),
             state = individual.fitness()
             counter += 1
             if ((state == False)):

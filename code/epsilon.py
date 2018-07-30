@@ -4,8 +4,6 @@ from scipy.optimize import fmin_tnc
 import random
 import pandas as pd
 from pandas_datareader import data as pdr
-import fix_yahoo_finance as yf
-#yf.pdr_override() # <== that's all it takes :-)
 from pandas import Series, DataFrame
 import datetime
 import itertools

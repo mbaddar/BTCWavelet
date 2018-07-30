@@ -68,14 +68,14 @@ if __name__ == "__main__":
     df2 = c.get_complete_df ( path, ['close', 'high'] )
     print("data size :" ,df2.close.size)
     #Extracts a list of the close data
-    data = df2['close'].tolist()[-4096:]
+    data = df2['close'].tolist()[-8192:]
     # data = df2['close'].tolist()[-32768:]
     d = Decomposition( data)
     coeffs = d.wavelet_decomposition( wavelet_name= "db8")
     #wavelet_decomposition [cA_n, cD_n, cD_n-1, …, cD2, cD1]
 
     # reconstruction 
-    for i in range(2,8): #remove 6 coefficients
+    for i in range(1,8): #remove 6 coefficients
         coeffs[-i] = np.zeros_like(coeffs[-i]) 
     recon = waverec( coeffs, "db8", mode= "smooth")
     plt.plot(data)
