@@ -363,9 +363,10 @@ class Epsilon_Drawdown:
         """
         lst = []
         if threshold == self.__DST: # short term bubble
-            lst = [ x for x in ntpk if x>= self.__DST and x<self.__DLT ]
+            #ntpk is a tuple list of peaks and their fractions
+            lst = [ x[0] for x in ntpk if x[1] >= self.__DST and x[1] < self.__DLT ]
         else:
-            lst = [ x for x in ntpk if x>= self.__DLT ]
+            lst = [ x[0] for x in ntpk if x[1] >= self.__DLT ]
 
         return lst
 
