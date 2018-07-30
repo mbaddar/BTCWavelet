@@ -385,7 +385,7 @@ class Epsilon_Drawdown:
 
         return lst
 
-class Lppl_Est:
+class Lagrange_regularizer:
     """
     Copyright: G.Demos @ ETH-Zurich - Jan.2017
     Swiss Finance Institute
@@ -531,7 +531,7 @@ if __name__ == "__main__":
     #l.peaks()
     #l.peaks()
 
-    # l = Lppl_Est()
+    # l = Lagrange_regularizer()
     # l.getSSE_and_SSEN_as_a_func_of_dt( normed= True, plot= True)
     # sse, ssen, x,y = l.getSSE_and_SSEN_as_a_func_of_dt()
     # slope = l.LagrangeMethod( sse)
