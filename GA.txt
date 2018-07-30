@@ -1,0 +1,19 @@
+﻿Spike:
+fitness out size: 8 0
+ fitness: 88.75553392822175
+A: 2.758 B: 8.949 Critical Time: 366.497 m: -0.112 c: -0.024 omega: 16.212 phi: 5.704
+ fitness: 89.87972991942132
+A: 2.828 B: 8.81 Critical Time: 369.501 m: -0.111 c: -0.023 omega: 16.105 phi: 5.782
+ fitness: 89.87972991942132
+A: 2.828 B: 8.81 Critical Time: 369.501 m: -0.111 c: -0.023 omega: 16.105 phi: 5.782
+
+
+Less spike:
+ fitness out size: 8 0
+ fitness: 43.45369533164454
+A: 5.389 B: 0.0 Critical Time: 912.627 m: 1.406 c: 0.079 omega: 18.651 phi: 0.284
+ fitness: 43.45369533164454
+A: 5.389 B: 0.0 Critical Time: 912.627 m: 1.406 c: 0.079 omega: 18.651 phi: 0.284
+ fitness: 43.45369533164454
+A: 5.389 B: 0.0 Critical Time: 912.627 m: 1.406 c: 0.079 omega: 18.651 phi: 0.284
+

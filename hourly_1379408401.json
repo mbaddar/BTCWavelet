@@ -1,0 +1,32 @@
+{
+    "Aggregated": false,
+    "ConversionType": {
+        "conversionSymbol": "",
+        "type": "direct"
+    },
+    "Data": [
+        {
+            "close": 125.12,
+            "high": 125.12,
+            "low": 125.12,
+            "open": 125.12,
+            "time": 1379408400,
+            "volumefrom": 0,
+            "volumeto": 0
+        },
+        {
+            "close": 125.12,
+            "high": 125.12,
+            "low": 125.12,
+            "open": 125.12,
+            "time": 1379412000,
+            "volumefrom": 0,
+            "volumeto": 0
+        },
+   ],
+    "FirstValueInArray": true,
+    "Response": "Success",
+    "TimeFrom": 1379408400,
+    "TimeTo": 1386608400,
+    "Type": 100
+}
