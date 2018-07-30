@@ -21,7 +21,8 @@ class Epsilon_Drawdown:
     Epsilon Drawdown Method developed by Johansen and Sornette (1998, 2001)
     and further used in (Johansen and Sornette, 2010; Filimonov and Sornette, 2015).
     """
-    __threshold = 0.6
+    __threshold = 0.1
+    __threshold_Hourly = 0.6
     __DST = 0.65 #Short term threshold
     __DLT = 0.95 #Long term thresold
 
@@ -37,8 +38,17 @@ class Epsilon_Drawdown:
         """
         The time window search space is used to calculate the sliding volatility 
         """
-        return range( 24 ,241, 24)
-        #return range( 10 ,61, 5)
+        #return range( 24 ,241, 24)
+        return range( 10 ,61, 5)
+    
+    #Only getters
+    @property
+    def short_threshold(self):
+        return self.__DST
+    
+    @property 
+    def long_threshold( self):
+        return self.__DLT
 
     @property
     def data(self):
@@ -53,8 +63,8 @@ class Epsilon_Drawdown:
         return self.__data_size
 
     def __init__ (self, path= "Data/cmc/daily.csv"):
-        self.__data = self.get_hourly_data( )
-        #self.__data = self.get_data( path)
+        #self.__data = self.get_hourly_data( )
+        self.__data = self.get_data( path)
         #self.__data = self.get_test_data()
         # A primitive way ot caching the log return p list
         self.__data_size = self.__data.LogClose.size
@@ -364,6 +374,7 @@ class Epsilon_Drawdown:
         lst = []
         if threshold == self.__DST: # short term bubble
             #ntpk is a tuple list of peaks and their fractions
+            # TODO avoid constructing a list and write a efficient code 
             lst = [ x[0] for x in ntpk if x[1] >= self.__DST and x[1] < self.__DLT ]
         else:
             lst = [ x[0] for x in ntpk if x[1] >= self.__DLT ]
@@ -489,14 +500,16 @@ class Lppl_Est:
 
 if __name__ == "__main__":
     l = Epsilon_Drawdown( )
-    tp = l.tpeaks( plot = True )
-    print("=== Ntpk: === ")
-    l.get_peaks()
-    # df = l.get_data()
-    # df.LogClose.plot()
-    # plt.show()
+    tp = l.tpeaks( plot = False )
+    ntpk = l.Ntpk( tp)
+    potential_bubbles = l.potential_bubble( ntpk, l.long_threshold )
+    draw_points = [(d, l.data.LogClose[d]) for d in potential_bubbles]
+    print("Draw points:", draw_points)
+    l.data.LogClose.plot()
+    plt.scatter(*zip(*draw_points) )
+    plt.show()
     # l.plot_delta(1, 10)
-    #deltas = l.plot_delta(1, 250)
+    #deltas = l.plot_delta(1, 250)long_threshold
     #i1 = l.i1drawup(0)
     # i1 = l.i1(0, drawup=True)
     # print("Argmax found:" + str(i1))

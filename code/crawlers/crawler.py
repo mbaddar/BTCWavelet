@@ -454,11 +454,11 @@ class BinanceCrawler ( BaseCrawler):
     def run(self):
         pass
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    b = BinanceCrawler( limit=10)
-    ar = b.get_API( b.endpoint )
-    print( type(ar))
+#     b = BinanceCrawler( limit=10)
+#     ar = b.get_API( b.endpoint )
+#     print( type(ar))
 
 
 
