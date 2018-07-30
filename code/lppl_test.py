@@ -18,7 +18,7 @@ def run( search = True):
         [-10, -0.1],     # B :
         [340, 410],     # Critical Time :
         #[350, 400],     # Critical Time :
-        [.01, .99],       # m :
+        [0., 1.],       # m :
         [-1, 1],        # c :
         [6, 25],       # omega
         #[12, 25],       # omega

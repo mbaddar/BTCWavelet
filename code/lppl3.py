@@ -32,7 +32,7 @@ class Epsilon_Drawdown:
         This is to incorporate the dynamics of realized return volatility
         in calculating the stopping tolerance for the drawups/downs
         """
-        return np.around( [i for i in np.arange( 4.1 , 5.1, 0.9)], 1).tolist()
+        return np.around( [i for i in np.arange( 0.1 , 5.1, 0.1)], 1).tolist()
         #return np.around( [i for i in np.arange( 0.1 , 5.1, 0.1)], 1).tolist()
     def window_search_space(self):
         """
@@ -108,9 +108,13 @@ class Epsilon_Drawdown:
         return df
 
     def get_data(self, path= "Data/cmc/daily.csv"):
-        daily_data = pd.read_csv( path, sep='\t', parse_dates=['Date'], 
+        daily_data = pd.read_csv( path, sep='\t', parse_dates=['Date'], index_col= 'Date', 
                                     names=[ 'Date', 'Open', 'High', 'Low', 'PirceClose', 'Volume', 'MarketCap'],
                                     header=0)
+
+        #filter some dates
+        #daily_data = daily_data.loc[daily_data.index >= '2015-01-01 00:00:00']
+        daily_data = daily_data.loc[daily_data.index <= '2018-1-1 00:00:00']
 
         daily_data['Open'] = daily_data['Open'].apply(lambda x: float( x.replace(',','') ) )
         daily_data['High'] = daily_data['High'].apply(lambda x: float( x.replace(',','') ) )
@@ -119,11 +123,11 @@ class Epsilon_Drawdown:
         # Lppl works on log prices
         daily_data['LogClose'] = daily_data['PirceClose'].apply( lambda x: np.log(x) )
         #reverse index
+        daily_data = daily_data.reset_index()
         daily_data.index = reversed(daily_data.index)
-        daily_data= daily_data.sort_index()
-        #filter some dates
-        # daily_data = daily_data.loc[daily_data.index >= '2015-01-01 00:00:00']
-        # daily_data = daily_data.loc[daily_data.index <= '2017-11-28 00:00:00']
+        #Index reset to a seq
+        daily_data = daily_data.sort_index()
+        print( daily_data.head() )
         self.data = daily_data
         return daily_data
 
@@ -500,13 +504,19 @@ class Lppl_Est:
 
 if __name__ == "__main__":
     l = Epsilon_Drawdown( )
+    l.data.LogClose.plot()
     tp = l.tpeaks( plot = False )
     ntpk = l.Ntpk( tp)
     potential_bubbles = l.potential_bubble( ntpk, l.long_threshold )
     draw_points = [(d, l.data.LogClose[d]) for d in potential_bubbles]
-    print("Draw points:", draw_points)
-    l.data.LogClose.plot()
-    plt.scatter(*zip(*draw_points) )
+
+    #plt.scatter(*zip(*draw_points) )
+
+    potential_bubbles = l.potential_bubble( ntpk, l.short_threshold )
+    print(potential_bubbles)
+    draw_points2 = [(d, l.data.LogClose[d]) for d in potential_bubbles]
+    plt.scatter(*zip(*draw_points2) )
+
     plt.show()
     # l.plot_delta(1, 10)
     #deltas = l.plot_delta(1, 250)long_threshold
