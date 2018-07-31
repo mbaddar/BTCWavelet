@@ -231,7 +231,7 @@ def run( search = True):
     t2 = "2017-05-25 00:00:00"
     dataSeries = d.get_lppl_data(date_from= t1, date_to = t2)
     data_size = d.data_size
-    cluster = []
+    points = []
     for step in range(0, data_size-10 ): #skip 5 time points and recalculate
         # respective minimum and maximum values ​​of the seven parameters fitting process
         dt = data_size - step
@@ -282,10 +282,18 @@ def run( search = True):
             # wrappers[2].plot( values[0].getDataSeries()[0] )
         else:
             print("No values")
-        cluster.append( (wrappers[0].tc-dt, dt ) )
-    plt.scatter(*zip(*cluster) )
+        points.append( (wrappers[0].tc-dt, dt ) )
+    plt.scatter( *zip( *points) )
+    plt.gca().set_xlabel('tc-t2')
+    plt.gca().set_ylabel('dt = t2-t1')
+    plt.scatter( *zip( *cluster(points, 4)) )
     plt.show(block=True)
-    print(cluster )
+    print(points )
+
+
+def cluster (points, n_clusters =2 ):
+    kmeans = KMeans(init='k-means++', n_clusters= n_clusters, n_init=10).fit(points)
+    return kmeans.cluster_centers_
 
 class Lppl_Wrapper:
 
@@ -335,6 +343,8 @@ class Lppl_Wrapper:
 
     def plot(self, ts):
         plt.plot(ts, list(self.generator(ts))[0]  )
+
+
 
 if __name__ == "__main__":
 
