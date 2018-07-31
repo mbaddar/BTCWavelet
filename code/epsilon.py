@@ -14,6 +14,100 @@ import time
 from time import sleep
 from sklearn import linear_model
 
+class Data_Wrapper:
+    @property
+    def lppl_data(self):
+        return self.__lppl_data
+
+    @lppl_data.setter
+    def lppl_data(self, lppl_data):
+        self.__lppl_data = lppl_data
+
+    @property #getter only
+    def data_size(self):
+        return self.__data_size
+        
+    def __init__ (self):
+        self.__lppl_data = None        
+
+    def get_lppl_data(self, date_from = '2015-09-01 00:00:00', date_to = '2015-10-24 00:00:00', force_read = False ):
+        # BTC
+        daily_data = self.lppl_data
+        #read once 
+        if not self.lppl_data or force_read:
+            print("Reading data from csv") 
+            daily_data = pd.read_csv( "Data/cmc/daily.csv", sep='\t', parse_dates=['Date'], index_col='Date', 
+                                    names=[ 'Date', 'Open', 'High', 'Low', 'PirceClose', 'Volume', 'MarketCap'],
+                                    header=0)  
+            #data preprocessing. remove the , mark 
+            daily_data['Open'] = daily_data['Open'].apply(lambda x: float( x.replace(',','') ) )
+            daily_data['High'] = daily_data['High'].apply(lambda x: float( x.replace(',','') ) )
+            daily_data['Low'] = daily_data['Low'].apply(lambda x: float( x.replace(',','') ) )
+            daily_data['PirceClose'] = daily_data['PirceClose'].\
+                    apply(lambda x: float( x.replace(',','') ) )
+            # Lppl works on log prices
+            daily_data['Close'] = daily_data['PirceClose'].apply( lambda x: np.log(x) )
+            self.lppl_data = daily_data 
+        #Filter
+        daily_data = daily_data.loc[daily_data.index >= date_from] #Min
+        daily_data = daily_data.loc[daily_data.index <= date_to] #Max
+        #reverse index
+        # daily_data.index = reversed(daily_data.index)
+        # daily_data= daily_data.sort_index()
+        #date = daily_data.index
+        time = np.linspace( 0, len(daily_data)-1, len(daily_data)) #just a sequence 
+        # Reversed data 
+        close = [daily_data.Close[-i] for i in range(1,len(daily_data.Close)+1)]
+        dataSeries = [time, close]
+        self.__data_size = dataSeries[0].size
+        return dataSeries
+
+
+    def get_hourly_data( self):
+        path = "2018"
+        c = Crawler()
+        # Create a DataFrame from the crawled files
+        hourly_data = c.get_complete_df ( path, ['close'] ).reset_index()
+        hourly_data['LogClose'] = hourly_data['close'].apply( lambda x: np.log(x) )
+        self.data = hourly_data
+        return hourly_data
+
+    def get_test_data(self):
+        #Test data
+        a = np.linspace(1,4,10).tolist() + np.linspace(4,3,5).tolist() + \
+            np.linspace(3,7,10).tolist() + np.linspace(7,4,10).tolist()
+
+        a += np.linspace(4,12,10).tolist() + np.linspace(12,10,5).tolist() \
+            + np.linspace(10,15,10).tolist()
+        df = DataFrame(a)
+        df.columns = ['LogClose']
+        #df.index = reversed(df.index)
+        return df
+
+    def get_data(self, path= "Data/cmc/daily.csv"):
+        daily_data = pd.read_csv( path, sep='\t', parse_dates=['Date'], index_col= 'Date', 
+                                    names=[ 'Date', 'Open', 'High', 'Low', 'PirceClose', 'Volume', 'MarketCap'],
+                                    header=0)
+
+        #filter some dates
+        #daily_data = daily_data.loc[daily_data.index >= '2015-01-01 00:00:00']
+        daily_data = daily_data.loc[daily_data.index <= '2018-1-1 00:00:00']
+
+        daily_data['Open'] = daily_data['Open'].apply(lambda x: float( x.replace(',','') ) )
+        daily_data['High'] = daily_data['High'].apply(lambda x: float( x.replace(',','') ) )
+        daily_data['Low'] = daily_data['Low'].apply(lambda x: float( x.replace(',','') ) )
+        daily_data['PirceClose'] = daily_data['PirceClose'].apply(lambda x: float( x.replace(',','') ) )
+        # Lppl works on log prices
+        daily_data['LogClose'] = daily_data['PirceClose'].apply( lambda x: np.log(x) )
+        #reverse index
+        daily_data = daily_data.reset_index()
+        daily_data.index = reversed(daily_data.index)
+        #Index reset to a seq
+        daily_data = daily_data.sort_index()
+        print( daily_data.head() )
+        self.data = daily_data
+        return daily_data
+
 class Epsilon_Drawdown:
     """
     Epsilon Drawdown Method developed by Johansen and Sornette (1998, 2001)
@@ -61,9 +155,10 @@ class Epsilon_Drawdown:
         return self.__data_size
 
     def __init__ (self, path= "Data/cmc/daily.csv"):
-        #self.__data = self.get_hourly_data( )
-        self.__data = self.get_data( path)
-        #self.__data = self.get_test_data()
+        #self.__data = Data_Wrapper().get_hourly_data( )
+        #Data could have static methods. Might change later 
+        self.__data = Data_Wrapper().get_data( path)
+        #self.__data = Data_Wrapper().get_test_data()
         # A primitive way ot caching the log return p list
         self.__data_size = self.__data.LogClose.size
         #Optimize the return p_list starting from every item on the TS
@@ -84,50 +179,6 @@ class Epsilon_Drawdown:
             #     print(len(l), " elements: [" , ",".join( [str("{0:.2f}".format(i)) for i in l ]), "]"  )
             #print("Done plist")
 
-    def get_hourly_data( self):
-        path = "2018"
-        c = Crawler()
-        # Create a DataFrame from the crawled files
-        hourly_data = c.get_complete_df ( path, ['close'] ).reset_index()
-        hourly_data['LogClose'] = hourly_data['close'].apply( lambda x: np.log(x) )
-        self.data = hourly_data
-        return hourly_data
-
-    def get_test_data(self):
-        #Test data
-        a = np.linspace(1,4,10).tolist() + np.linspace(4,3,5).tolist() + \
-            np.linspace(3,7,10).tolist() + np.linspace(7,4,10).tolist()
-
-        a += np.linspace(4,12,10).tolist() + np.linspace(12,10,5).tolist() \
-            + np.linspace(10,15,10).tolist()
-        df = DataFrame(a)
-        df.columns = ['LogClose']
-        #df.index = reversed(df.index)
-        return df
-
-    def get_data(self, path= "Data/cmc/daily.csv"):
-        daily_data = pd.read_csv( path, sep='\t', parse_dates=['Date'], index_col= 'Date', 
-                                    names=[ 'Date', 'Open', 'High', 'Low', 'PirceClose', 'Volume', 'MarketCap'],
-                                    header=0)
-
-        #filter some dates
-        #daily_data = daily_data.loc[daily_data.index >= '2015-01-01 00:00:00']
-        daily_data = daily_data.loc[daily_data.index <= '2018-1-1 00:00:00']
-
-        daily_data['Open'] = daily_data['Open'].apply(lambda x: float( x.replace(',','') ) )
-        daily_data['High'] = daily_data['High'].apply(lambda x: float( x.replace(',','') ) )
-        daily_data['Low'] = daily_data['Low'].apply(lambda x: float( x.replace(',','') ) )
-        daily_data['PirceClose'] = daily_data['PirceClose'].apply(lambda x: float( x.replace(',','') ) )
-        # Lppl works on log prices
-        daily_data['LogClose'] = daily_data['PirceClose'].apply( lambda x: np.log(x) )
-        #reverse index
-        daily_data = daily_data.reset_index()
-        daily_data.index = reversed(daily_data.index)
-        #Index reset to a seq
-        daily_data = daily_data.sort_index()
-        print( daily_data.head() )
-        self.data = daily_data
-        return daily_data
 
     def volatility( self, i, window = 5):
         """

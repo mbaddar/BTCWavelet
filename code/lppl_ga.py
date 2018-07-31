@@ -10,7 +10,7 @@ from pandas import Series, DataFrame
 import datetime
 import itertools
 from sklearn.metrics import mean_squared_error
-
+from epsilon import Data_Wrapper #Data crawler class 
 #Nasdaq
 # daily_data = pd.read_csv( "Data/Stock/NASDAQCOM.csv", sep=',', index_col = 0, names=['Close'], header=None )
 # daily_data['Close'] = daily_data['Close'].apply( lambda x: np.nan if x=='.' else float(x) )
@@ -24,33 +24,6 @@ from sklearn.metrics import mean_squared_error
 # close = [sz.Close[i] for i in range(len(sz.Close))]
 # print(sz.Close.describe() )
 
-# BTC
-daily_data = pd.read_csv( "Data/cmc/daily.csv", sep='\t', parse_dates=['Date'], index_col='Date', 
-                            names=[ 'Date', 'Open', 'High', 'Low', 'PirceClose', 'Volume', 'MarketCap'],
-                            header=0)
-
-daily_data = daily_data.loc[daily_data.index <= '2015-10-24 00:00:00'] #Max
-daily_data = daily_data.loc[daily_data.index >= '2015-09-01 00:00:00'] #Min
-
-daily_data['Open'] = daily_data['Open'].apply(lambda x: float( x.replace(',','') ) )
-daily_data['High'] = daily_data['High'].apply(lambda x: float( x.replace(',','') ) )
-daily_data['Low'] = daily_data['Low'].apply(lambda x: float( x.replace(',','') ) )
-daily_data['PirceClose'] = daily_data['PirceClose'].apply(lambda x: float( x.replace(',','') ) )
-# Lppl works on log prices
-daily_data['Close'] = daily_data['PirceClose'].apply( lambda x: np.log(x) )
-#filter some dates
-
-#reverse index
-# daily_data.index = reversed(daily_data.index)
-# daily_data= daily_data.sort_index()
-
-#plt.plot(daily_data['Close'])
-
-date = daily_data.index
-time = np.linspace( 0, len(daily_data)-1, len(daily_data)) #just a sequence 
-close = [daily_data.Close[-i] for i in range(1,len(daily_data.Close)+1)]
-DataSeries = [time, close]
-
 # plt.plot(DataSeries[0], DataSeries[1])
 # plt.show()
 # # sz = get_price(order_book_ids='159915.XSHE',start_date='20140101',end_date='20150610',fields="ClosingPx")
@@ -58,6 +31,8 @@ DataSeries = [time, close]
 # time = np.linspace(0, len(sz)-1, len(sz))
 # close = np.array(np.log(sz))
 # DataSeries = [time, close]
+# d = Data_Wrapper()
+# DataSeries = d.get_lppl_data()
 
 def lppl (t,x): #return fitting result using LPPL parameters
     a = x[0]
@@ -73,40 +48,39 @@ def lppl (t,x): #return fitting result using LPPL parameters
         print( "(tc=%d,t=%d)"% (tc,t) )
 
 
-def func(x):
-    """
-    The fitness function returns the SSE between lppl and the log price list
-    TODO Still doesn't respect boundaries
-    """
-    lppl_values = lppl( DataSeries[0],x)
-    #lppl_values = [lppl(t,x) for t in DataSeries[0]]
-
-    #actuals = DataSeries[1]
-    delta = np.subtract( lppl_values, DataSeries[1])
-    delta = np.power( delta, 2)
-    sse = np.sum( delta) #SSE
-
-    return sse
-    #return mean_squared_error(actuals, lppl_values )
 
 class Individual:
     """base class for individuals"""
 
-    def __init__ (self, InitValues, limits):
+    def __init__ (self, InitValues, limits, data_series):
         self.fit = 0
         self.cof = InitValues
         lim = [ (a[0],a[1]) for a in limits] 
         self.limits = lim
+        self.data_series = data_series
+
+    def func(self, x):
+        """
+        The fitness function returns the SSE between lppl and the log price list
+        """
+        lppl_values = lppl( self.data_series[0],x)
+        #lppl_values = [lppl(t,x) for t in DataSeries[0]]
+        #actuals = DataSeries[1]
+        delta = np.subtract( lppl_values, self.data_series[1])
+        delta = np.power( delta, 2)
+        sse = np.sum( delta) #SSE
+        return sse
+        #return mean_squared_error(actuals, lppl_values )
 
     def fitness(self):
         try:
-            cofs, nfeval, rc = fmin_tnc( func,
+            cofs, nfeval, rc = fmin_tnc( self.func,
                                         self.cof, 
                                         fprime=None,
                                         approx_grad=True,
                                         bounds =  self.limits, #Added to respect boundaries
                                         messages=0)
-            self.fit = func(cofs)
+            self.fit = self.func(cofs)
             self.cof = cofs
         except:
             #does not converge
@@ -121,7 +95,7 @@ class Individual:
             else:
                 reply.append(partner.cof[i])
         #Limit do not change
-        return Individual( reply, self.limits) 
+        return Individual( reply, self.limits, self.data_series) 
 
     def mutate(self):
         for i in range(0, len(self.cof)-1):
@@ -138,28 +112,28 @@ class Individual:
         cofs += " omega: " + str(round(self.cof[5], 3))
         cofs += " phi: " + str(round(self.cof[6], 3))
         return " fitness: " + str(self.fit) +"\n" + cofs
-
+        
     def getDataSeries(self):
-        return DataSeries
+        return self.data_series
 
     def getExpData(self):
         #Return a list of lppl values For every time point in t 
-        ds = [lppl(t,self.cof) for t in DataSeries[0]]
+        ds = [lppl(t,self.cof) for t in self.data_series[0]]
         return ds
 
-    def getTradeDate(self):
-        return date
+    # def getTradeDate(self):
+    #     return date
 
-def fitFunc(t, a, b, tc, m, c, w, phi):
-    val = a + ( b*np.power( np.abs(tc-t), m) ) *(1 + (c*np.cos((w*np.log( np.abs( tc-t ) ))+phi)))
-    return val
+# def fitFunc(t, a, b, tc, m, c, w, phi):
+#     val = a + ( b*np.power( np.abs(tc-t), m) ) *(1 + (c*np.cos((w*np.log( np.abs( tc-t ) ))+phi)))
+#     return val
 
 class Population:
     """base class for a population"""
 
     LOOP_MAX = 500
 
-    def __init__ (self, limits, size, eliminate, mate, probmutate, vsize):
+    def __init__ (self, limits, size, eliminate, mate, probmutate, vsize, data_series ):
         'seeds the population'
         'limits is a tuple holding the lower and upper limits of the cofs'
         'size is the size of the seed population'
@@ -169,9 +143,10 @@ class Population:
         self.mate = mate
         self.probmutate = probmutate
         self.fitness = []
+        self.data_series = data_series
         for _ in range(size):
             SeedCofs = [ random.uniform(a[0], a[1]) for a in limits ]
-            self.populous.append(Individual(SeedCofs , limits))
+            self.populous.append(Individual(SeedCofs , limits, data_series ))
 
     def PopulationPrint(self):
         for x in self.populous:
@@ -247,6 +222,10 @@ class Population:
         return reply
 
 def run( search = True):
+    
+    d = Data_Wrapper()
+    dataSeries = d.get_lppl_data()
+    data_size = dataSeries[0].size
     # respective minimum and maximum values ​​of the seven parameters fitting process
     limits = (
         [1, 200],     # A :
@@ -260,7 +239,7 @@ def run( search = True):
         [0, 2 * np.pi]  # phi : up to 8.83
     )
     #x = lppl.Population(limits, 20, 0.3, 1.5, .05, 4)
-    x = Population( limits, 20, 0.3, 1.5, .05, 4)
+    x = Population( limits, 20, 0.3, 1.5, .05, 4, dataSeries )
     #for i in range(2):
     for _ in range(2):
         x.Fitness()
@@ -270,22 +249,74 @@ def run( search = True):
 
     x.Fitness()
     values = x.BestSolutions(3)
+    wrappers = []
     if values:
         for x in values:
             print(x.PrintIndividual())
+            model = [ x.cof[i] for i in range(7)]
+            wrappers.append( Lppl_Wrapper( model, x.fit ) )
 
         #TODO Buggy
         data = pd.DataFrame({'Date':values[0].getDataSeries()[0],
-                            'Index':np.exp( values[0].getDataSeries()[1]), #Display the price instead of log p
-                            'Fit1' :np.exp( values[0].getExpData() ),
-                            'Fit2' :np.exp( values[1].getExpData() ),
-                            'Fit3' :np.exp( values[2].getExpData() ) })
+                            'Index': values[0].getDataSeries()[1], #Display the price instead of log p
+                            'Fit1' : values[0].getExpData() ,
+                            'Fit2' : values[1].getExpData() ,
+                            'Fit3' : values[2].getExpData()  })
         data = data.set_index('Date')
-        data.to_csv("Data/lppl_fit.csv")
+        #data.to_csv("Data/lppl_fit.csv")
         data.plot(figsize=(14,8))
+        # plt.plot( values[0].getDataSeries()[0],  values[0].getDataSeries()[1] )
+        # wrappers[0].plot( values[0].getDataSeries()[0] )
+        # wrappers[1].plot( values[0].getDataSeries()[0] )
+        # wrappers[2].plot( values[0].getDataSeries()[0] )
         plt.show(block=True)
     else:
         print("No values")
+
+class Lppl_Wrapper:
+
+    @property
+    def sse(self):
+        return self.__sse
+
+    @sse.setter
+    def sse(self, sse):
+        self.__sse = sse
+
+    @property
+    def model(self):
+        return self.__model
+
+    @model.setter
+    def model(self, model):
+        self.__model = model
+
+    def __init__ ( self, model, sse):
+        self.__model = model       
+        self.__sse = sse 
+
+
+    def generator (self, ts): #return fitting result using LPPL parameters
+        """
+        ts is a numpy array of time points starting from 0
+        """
+        #TODO check for errors. E.g. empty model
+        x = self.model
+
+        a = x[0]
+        b = x[1]
+        tc = x[2]
+        m = x[3]
+        c = x[4]
+        w = x[5]
+        phi = x[6]
+        try:
+            yield a + ( b*np.power( np.abs(tc-ts), m) ) *( 1 + ( c*np.cos((w*np.log( np.abs( tc-ts)))+ phi)))
+        except BaseException:
+            print( "(tc=%d,t=%d)"% (tc,ts) )
+
+    def plot(self, ts):
+        plt.plot(ts, list(self.generator(ts))[0]  )
 
 if __name__ == "__main__":
 
@@ -296,7 +327,7 @@ if __name__ == "__main__":
     # data['Fit3'] = data['Fit3'].apply(lambda x: np.exp(x) )
     # data.Fit2.plot(figsize=(14,8))
     # plt.show(block=True)
-    run()
     random.seed()
+    run()
 
 
