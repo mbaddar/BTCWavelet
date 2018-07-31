@@ -246,4 +246,57 @@ class Population:
             reply.append(self.populous[i])
         return reply
 
+def run( search = True):
+    # respective minimum and maximum values ​​of the seven parameters fitting process
+    limits = (
+        [1, 200],     # A :
+        [-100, -0.1],     # B :
+        [53, 70],     # Critical Time :
+        #[350, 400],     # Critical Time :
+        [0.01, .999],       # m :
+        [-1, 1],        # c :
+        [4, 25],       # omega
+        #[12, 25],       # omega
+        [0, 2 * np.pi]  # phi : up to 8.83
+    )
+    #x = lppl.Population(limits, 20, 0.3, 1.5, .05, 4)
+    x = Population( limits, 20, 0.3, 1.5, .05, 4)
+    #for i in range(2):
+    for _ in range(2):
+        x.Fitness()
+        x.Eliminate()
+        x.Mate()
+        x.Mutate()
+
+    x.Fitness()
+    values = x.BestSolutions(3)
+    if values:
+        for x in values:
+            print(x.PrintIndividual())
+
+        #TODO Buggy
+        data = pd.DataFrame({'Date':values[0].getDataSeries()[0],
+                            'Index':np.exp( values[0].getDataSeries()[1]), #Display the price instead of log p
+                            'Fit1' :np.exp( values[0].getExpData() ),
+                            'Fit2' :np.exp( values[1].getExpData() ),
+                            'Fit3' :np.exp( values[2].getExpData() ) })
+        data = data.set_index('Date')
+        data.to_csv("Data/lppl_fit.csv")
+        data.plot(figsize=(14,8))
+        plt.show(block=True)
+    else:
+        print("No values")
+
+if __name__ == "__main__":
+
+    # data = pd.read_csv("Data/lppl_fit.csv", header=0)
+    # data = data.set_index('Date')
+    # data['Fit1'] = data['Fit1'].apply(lambda x: np.exp(x) )
+    # data['Fit2'] = data['Fit2'].apply(lambda x: np.exp(x) )
+    # data['Fit3'] = data['Fit3'].apply(lambda x: np.exp(x) )
+    # data.Fit2.plot(figsize=(14,8))
+    # plt.show(block=True)
+    run()
     random.seed()
+
+

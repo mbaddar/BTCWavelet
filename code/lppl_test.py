@@ -1,8 +1,3 @@
-'''
-Help from https://www.ricequant.com/community/topic/427/
-Thanks ricequant!
-Updated implementation of the LPPL model running on the s&p 500
-'''
 import lppl_ga as lppl
 from matplotlib import pyplot as plt
 import datetime

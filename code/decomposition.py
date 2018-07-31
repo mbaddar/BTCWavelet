@@ -75,7 +75,7 @@ if __name__ == "__main__":
     #wavelet_decomposition [cA_n, cD_n, cD_n-1, …, cD2, cD1]
 
     # reconstruction 
-    for i in range(1,8): #remove 6 coefficients
+    for i in range(1,8): #remove 7 coefficients out of 8. The smoothest 
         coeffs[-i] = np.zeros_like(coeffs[-i]) 
     recon = waverec( coeffs, "db8", mode= "smooth")
     plt.plot(data)
