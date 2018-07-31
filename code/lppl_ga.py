@@ -286,14 +286,16 @@ def run( search = True):
     plt.scatter( *zip( *points) )
     plt.gca().set_xlabel('tc-t2')
     plt.gca().set_ylabel('dt = t2-t1')
-    plt.scatter( *zip( *cluster(points, 4)) )
+    clusters, labels = cluster(points, 4)
+    plt.scatter( *zip( *clusters) )
     plt.show(block=True)
-    print(points )
+    print( metrics.silhouette_score(points, labels) )
+    print ( "Clusters: ", clusters )
 
 
 def cluster (points, n_clusters =2 ):
     kmeans = KMeans(init='k-means++', n_clusters= n_clusters, n_init=10).fit(points)
-    return kmeans.cluster_centers_
+    return kmeans.cluster_centers_, kmeans.labels_
 
 class Lppl_Wrapper:
 
