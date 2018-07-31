@@ -11,6 +11,9 @@ import datetime
 import itertools
 from sklearn.metrics import mean_squared_error
 from epsilon import Data_Wrapper #Data crawler class 
+from sklearn import metrics
+from sklearn.cluster import KMeans
+
 #Nasdaq
 # daily_data = pd.read_csv( "Data/Stock/NASDAQCOM.csv", sep=',', index_col = 0, names=['Close'], header=None )
 # daily_data['Close'] = daily_data['Close'].apply( lambda x: np.nan if x=='.' else float(x) )
@@ -224,54 +227,65 @@ class Population:
 def run( search = True):
     
     d = Data_Wrapper()
-    dataSeries = d.get_lppl_data()
-    data_size = dataSeries[0].size
-    # respective minimum and maximum values ​​of the seven parameters fitting process
-    limits = (
-        [1, 200],     # A :
-        [-100, -0.1],     # B :
-        [53, 70],     # Critical Time :
-        #[350, 400],     # Critical Time :
-        [0.01, .999],       # m :
-        [-1, 1],        # c :
-        [4, 25],       # omega
-        #[12, 25],       # omega
-        [0, 2 * np.pi]  # phi : up to 8.83
-    )
-    #x = lppl.Population(limits, 20, 0.3, 1.5, .05, 4)
-    x = Population( limits, 20, 0.3, 1.5, .05, 4, dataSeries )
-    #for i in range(2):
-    for _ in range(2):
+    t1 = "2017-03-24 00:00:00"
+    t2 = "2017-05-25 00:00:00"
+    dataSeries = d.get_lppl_data(date_from= t1, date_to = t2)
+    data_size = d.data_size
+    cluster = []
+    for step in range(0, data_size-10 ): #skip 5 time points and recalculate
+        # respective minimum and maximum values ​​of the seven parameters fitting process
+        dt = data_size - step
+        print("Step: %d, dt: %d" % (step, dt))
+        limits = (
+            [1, 200],     # A :
+            [-100, -0.1],     # B :
+            [dt, 2*dt],     # Critical Time : between the end of the TS part and 1 length away 
+            #[350, 400],    # Critical Time :
+            [0.01, .999],       # m :
+            [-1, 1],        # c :
+            [4, 25],       # omega
+            #[12, 25],       # omega
+            [0, 2 * np.pi]  # phi : up to 8.83
+        )
+        #x = lppl.Population(limits, 20, 0.3, 1.5, .05, 4)
+        x = Population( limits, 20, 0.3, 1.5, .05, 4, \
+        [ dataSeries[0][step:], dataSeries[1][step:] ] )
+        #for i in range(2):
+        for _ in range(2):
+            x.Fitness()
+            x.Eliminate()
+            x.Mate()
+            x.Mutate()
+
         x.Fitness()
-        x.Eliminate()
-        x.Mate()
-        x.Mutate()
+        values = x.BestSolutions(3)
+        wrappers = []
+        if values:
+            for x in values:
+                print(x.PrintIndividual())
+                model = [ x.cof[i] for i in range(7)]
+                wrappers.append( Lppl_Wrapper( model, x.fit ) )
 
-    x.Fitness()
-    values = x.BestSolutions(3)
-    wrappers = []
-    if values:
-        for x in values:
-            print(x.PrintIndividual())
-            model = [ x.cof[i] for i in range(7)]
-            wrappers.append( Lppl_Wrapper( model, x.fit ) )
-
-        #TODO Buggy
-        data = pd.DataFrame({'Date':values[0].getDataSeries()[0],
-                            'Index': values[0].getDataSeries()[1], #Display the price instead of log p
-                            'Fit1' : values[0].getExpData() ,
-                            'Fit2' : values[1].getExpData() ,
-                            'Fit3' : values[2].getExpData()  })
-        data = data.set_index('Date')
-        #data.to_csv("Data/lppl_fit.csv")
-        data.plot(figsize=(14,8))
-        # plt.plot( values[0].getDataSeries()[0],  values[0].getDataSeries()[1] )
-        # wrappers[0].plot( values[0].getDataSeries()[0] )
-        # wrappers[1].plot( values[0].getDataSeries()[0] )
-        # wrappers[2].plot( values[0].getDataSeries()[0] )
-        plt.show(block=True)
-    else:
-        print("No values")
+            #TODO Buggy
+            # data = pd.DataFrame({'Date':values[0].getDataSeries()[0],
+            #                     'Index': values[0].getDataSeries()[1], #Display the price instead of log p
+            #                     'Fit1' : values[0].getExpData() ,
+            #                     'Fit2' : values[1].getExpData() ,
+            #                     'Fit3' : values[2].getExpData()  })
+            # data = data.set_index('Date')
+            #data.to_csv("Data/lppl_fit.csv")
+            # if step ==0: # plot the TS 
+            #     plt.plot( values[0].getDataSeries()[0],  values[0].getDataSeries()[1] )
+            # Plot the lppl fits
+            # wrappers[0].plot( values[0].getDataSeries()[0] )
+            # wrappers[1].plot( values[0].getDataSeries()[0] )
+            # wrappers[2].plot( values[0].getDataSeries()[0] )
+        else:
+            print("No values")
+        cluster.append( (wrappers[0].tc-dt, dt ) )
+    plt.scatter(*zip(*cluster) )
+    plt.show(block=True)
+    print(cluster )
 
 class Lppl_Wrapper:
 
@@ -294,7 +308,11 @@ class Lppl_Wrapper:
     def __init__ ( self, model, sse):
         self.__model = model       
         self.__sse = sse 
+        self.__tc = model[2]
 
+    @property
+    def tc(self):
+        return self.__tc
 
     def generator (self, ts): #return fitting result using LPPL parameters
         """

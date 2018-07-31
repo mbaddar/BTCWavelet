@@ -13,8 +13,12 @@ from crawlers.crawler import Crawler
 import time
 from time import sleep
 from sklearn import linear_model
+from datetime import datetime,  timedelta
 
 class Data_Wrapper:
+
+    date_format = "%Y-%m-%d %H:%M:%S"
+
     @property
     def lppl_data(self):
         return self.__lppl_data
@@ -29,6 +33,14 @@ class Data_Wrapper:
         
     def __init__ (self):
         self.__lppl_data = None        
+
+    def get_days_between (self, date1, date2):
+        delta = datetime.strptime( date1, self.date_format) - datetime.strptime( date2, self.date_format)
+        return delta.days
+
+    def add_days (self, from_date, days=1 ):
+        new_date = datetime.strptime( from_date, self.date_format) + timedelta(days = days)
+        return new_date
 
     def get_lppl_data(self, date_from = '2015-09-01 00:00:00', date_to = '2015-10-24 00:00:00', force_read = False ):
         # BTC
