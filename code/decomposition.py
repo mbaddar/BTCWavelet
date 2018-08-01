@@ -4,22 +4,58 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pywt
-from pywt import wavedec, idwt, waverec
+from pywt import wavedec, idwt, waverec, downcoef
 
 
 from crawlers.crawler import Crawler
 import math
 import json
+import copy 
 
-class Decomposition:
-    # __data = []
-    def __init__ (self, data):
-        length = len(data)
-        if not self.power2( length):
-            pad = self.next_power_of_2(length) - length
-            for _ in range(pad): 
-                data.append( 0 )
+class Wavelet_Wrapper:
+
+    @property 
+    def data(self):
+        return self.__data
+
+    @data.setter
+    def data(self, data):
         self.__data = data
+
+    @property 
+    def coeffs(self):
+        return self.__coeffs
+
+    @coeffs.setter
+    def coeffs(self, coeffs):
+        self.__coeffs = coeffs
+
+    @property 
+    def wavelet_name(self):
+        return self.__wavelet_name
+
+    @wavelet_name.setter
+    def wavelet_name(self, wavelet_name):
+        self.__wavelet_name = wavelet_name
+
+    def __init__ (self, data, wavelet_name ='db8', padding = True):
+        data_size = len(data)
+        # Either 0 pad or trim
+        if not self.power2( data_size):
+            next_power2 = self.next_power_of_2( data_size)
+            if padding:
+                pad = next_power2 - data_size
+                for _ in range(pad): 
+                    data.append( 0 )
+            else:
+                trimmed_size = int(next_power2/2)
+                #Take the last power2 data points
+                data = data[ -trimmed_size: ]
+        
+        self.data = data
+        self.wavelet_name = wavelet_name
+        self.coeffs = self.wavelet_decomposition( wavelet_name)
+
 
     def power2(self, num):
         return ((num & (num - 1)) == 0) and num != 0
@@ -33,16 +69,24 @@ class Decomposition:
         else:
             raise TypeError("Number must be integer")
 
-    def wavelet_decomposition(self, wavelet_name ='haar' , level = None):
+    def wavelet_decomposition(self, level = None):
         """
         2-D Array of coefficients
         [cA_n, cD_n, cD_n-1, …, cD2, cD1]
+        cD1 is the highest (coarsest) level
+        cD_n is the most detailed. Applied first 
+        Each coeff level is half in length to the next one starting from n 
         """
         #TODO: raise an error of name not in family of wavelets
-        coeffs = wavedec( self.__data , wavelet_name , level= level)
+        coeffs = wavedec( self.data , self.wavelet_name , level=None )
+        self.__coeffs = coeffs
         return coeffs
-    
-    def plot_coefficients( self, coeffs, wavelet_name ):
+    def get_decomposition_level (self, level = 1):
+        """
+        Detail level
+        """
+        return downcoef('d', self.data, self.wavelet_name, mode='smooth', level = level )
+    def plot_coefficients( self, wavelet_name, coeffs ):
 
         #Construct a DataFrame from the coeffs
         coeff_dict = dict( ("Coefficient (%d)"% d, coeffs[d].tolist() ) 
@@ -60,26 +104,43 @@ class Decomposition:
         with open('coeffs.json', 'w+') as fp:
             json.dump( coeff_dict, fp, sort_keys=True, indent=4)
 
+    def reconstruct (self, level =1 ):
+        """
+        Reconstruct the original TS by removing up to n levels of details and 
+        applying the inverse DWT. 
+        Level 1 is the highest (coarsest) and level n is the lowest (most detailed)
+        0 is the summary level and cannot be removed. 
+        """
+        recon = None
+        coeffs = copy.deepcopy( self.coeffs)
+        print("coeff len: ", len(self.coeffs))
+        #wavelet_decomposition [cA_n, cD_n, cD_n-1, …, cD2, cD1]
+        if self.coeffs:
+            #remove (len-level) coefficients out of len. The smoothest 
+            for i in range(level , len(self.coeffs) ): 
+                coeffs[-i] = np.zeros_like(coeffs[-i]) 
+            recon = waverec( coeffs, self.wavelet_name , mode= "smooth")
+        return recon 
 if __name__ == "__main__":
     #filename = "2018/hourly_1530608400.json"
     path = "2018"
     c = Crawler()
     # Create a DataFrame from the crawled files
     df2 = c.get_complete_df ( path, ['close', 'high'] )
-    print("data size :" ,df2.close.size)
     #Extracts a list of the close data
-    data = df2['close'].tolist()[-8192:]
+    # data = df2['close'].tolist()[-4096:]
+    data = df2['close'].tolist()
     # data = df2['close'].tolist()[-32768:]
-    d = Decomposition( data)
-    coeffs = d.wavelet_decomposition( wavelet_name= "db8")
+    d = Wavelet_Wrapper( data, padding = False)
+    print("data size :" ,len(d.data) )
+    coeffs = d.wavelet_decomposition( )
     #wavelet_decomposition [cA_n, cD_n, cD_n-1, …, cD2, cD1]
 
     # reconstruction 
-    for i in range(1,8): #remove 7 coefficients out of 8. The smoothest 
-        coeffs[-i] = np.zeros_like(coeffs[-i]) 
-    recon = waverec( coeffs, "db8", mode= "smooth")
-    plt.plot(data)
-    plt.plot(recon)
+    #plt.subplot(2,1,1) #row, col, index
+    # plt.plot( d.data )
+    plt.plot (d.reconstruct( level = 1), color='red' )
+    
     plt.show()
     
     #d.plot_coefficients( coeffs, "db8")
