@@ -38,6 +38,13 @@ class Wavelet_Wrapper:
     def wavelet_name(self, wavelet_name):
         self.__wavelet_name = wavelet_name
 
+    @property 
+    def coeffs_size(self):
+        return self.__coeffs_size
+    @coeffs_size.setter
+    def coeffs_size(self, coeffs_size):
+        self.__coeffs_size = coeffs_size
+
     def __init__ (self, data, wavelet_name ='db8', padding = True):
         data_size = len(data)
         # Either 0 pad or trim
@@ -55,6 +62,7 @@ class Wavelet_Wrapper:
         self.data = data
         self.wavelet_name = wavelet_name
         self.coeffs = self.wavelet_decomposition( wavelet_name)
+        self.coeffs_size = len( self.coeffs )
 
 
     def power2(self, num):
@@ -121,6 +129,7 @@ class Wavelet_Wrapper:
                 coeffs[-i] = np.zeros_like(coeffs[-i]) 
             recon = waverec( coeffs, self.wavelet_name , mode= "smooth")
         return recon 
+
 if __name__ == "__main__":
     #filename = "2018/hourly_1530608400.json"
     path = "2018"

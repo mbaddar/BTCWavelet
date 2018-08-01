@@ -9,16 +9,30 @@ import datetime
 import itertools
 from sklearn.metrics import mean_squared_error
 import matplotlib.cm as cm
-from crawlers.crawler import Crawler
 import time
 from time import sleep
 from sklearn import linear_model
 from datetime import datetime,  timedelta
 
+from crawlers.crawler import Crawler
+from decomposition import Wavelet_Wrapper 
+
+date_format = "%Y-%m-%d %H:%M:%S"
+def get_days_between ( date1, date2):
+    delta = datetime.strptime( date1, date_format) - datetime.strptime( date2, date_format)
+    return delta.days
+
+def add_days ( from_date, days=1 ):
+    new_date = datetime.strptime( from_date, date_format) + timedelta(days = days)
+    return new_date
+
+def get_date_from_epoch( epoch):
+    t1 = time.gmtime( epoch)
+    t = datetime(t1.tm_year, t1.tm_mon, t1.tm_mday, t1.tm_hour, t1.tm_min, t1.tm_sec)
+    str_time = t.strftime( date_format )
+    return str_time
+    
 class Data_Wrapper:
-
-    date_format = "%Y-%m-%d %H:%M:%S"
-
     @property
     def lppl_data(self):
         return self.__lppl_data
@@ -27,20 +41,26 @@ class Data_Wrapper:
     def lppl_data(self, lppl_data):
         self.__lppl_data = lppl_data
 
+    @property
+    def data(self):
+        return self.__data
+
+    @data.setter
+    def data(self, data):
+        self.__data = data
+
     @property #getter only
     def data_size(self):
         return self.__data_size
         
-    def __init__ (self):
-        self.__lppl_data = None        
-
-    def get_days_between (self, date1, date2):
-        delta = datetime.strptime( date1, self.date_format) - datetime.strptime( date2, self.date_format)
-        return delta.days
-
-    def add_days (self, from_date, days=1 ):
-        new_date = datetime.strptime( from_date, self.date_format) + timedelta(days = days)
-        return new_date
+    def __init__ (self, hourly = True):
+        
+        self.lppl_data = None 
+        self.data = None
+        if hourly:
+            self.get_hourly_data()
+        else:
+            self.get_lppl_data()
 
     def get_lppl_data(self, date_from = '2015-09-01 00:00:00', date_to = '2015-10-24 00:00:00', force_read = False ):
         # BTC
@@ -75,13 +95,18 @@ class Data_Wrapper:
         return dataSeries
 
 
-    def get_hourly_data( self):
-        path = "2018"
+    def get_hourly_data( self, path = "2018"):
+        
         c = Crawler()
         # Create a DataFrame from the crawled files
+        # reset index pushes the date index into a column
         hourly_data = c.get_complete_df ( path, ['close'] ).reset_index()
         hourly_data['LogClose'] = hourly_data['close'].apply( lambda x: np.log(x) )
+        hourly_data.columns = ['date', 'close', 'LogClose']
+        hourly_data['StrDate'] = hourly_data['date'].apply( lambda epoch: get_date_from_epoch( epoch) )
+        print( hourly_data.head() )
         self.data = hourly_data
+        self.__data_size = hourly_data.LogClose.size 
         return hourly_data
 
     def get_test_data(self):
@@ -125,26 +150,11 @@ class Epsilon_Drawdown:
     Epsilon Drawdown Method developed by Johansen and Sornette (1998, 2001)
     and further used in (Johansen and Sornette, 2010; Filimonov and Sornette, 2015).
     """
-    __threshold = 0.1
-    __threshold_Hourly = 0.6
+    #__threshold = 0.1
+    __threshold = 0.6
     __DST = 0.65 #Short term threshold
     __DLT = 0.95 #Long term thresold
 
-    def e0_search_space(self):
-        """
-        Returns the epsilon E0 threshod search space. Currently [0.1:5]
-        This is to incorporate the dynamics of realized return volatility
-        in calculating the stopping tolerance for the drawups/downs
-        """
-        return np.around( [i for i in np.arange( 0.1 , 5.1, 0.1)], 1).tolist()
-        #return np.around( [i for i in np.arange( 0.1 , 5.1, 0.1)], 1).tolist()
-    def window_search_space(self):
-        """
-        The time window search space is used to calculate the sliding volatility 
-        """
-        #return range( 24 ,241, 24)
-        return range( 10 ,61, 5)
-    
     #Only getters
     @property
     def short_threshold(self):
@@ -166,30 +176,26 @@ class Epsilon_Drawdown:
     def data_size(self):
         return self.__data_size
 
-    def __init__ (self, path= "Data/cmc/daily.csv"):
-        #self.__data = Data_Wrapper().get_hourly_data( )
-        #Data could have static methods. Might change later 
-        self.__data = Data_Wrapper().get_data( path)
-        #self.__data = Data_Wrapper().get_test_data()
-        # A primitive way ot caching the log return p list
+
+    def e0_search_space(self):
+        """
+        Returns the epsilon E0 threshod search space. Currently [0.1:5]
+        This is to incorporate the dynamics of realized return volatility
+        in calculating the stopping tolerance for the drawups/downs
+        """
+        return np.around( [i for i in np.arange( 0.1 , 5.1, 0.1)], 1).tolist()
+        #return np.around( [i for i in np.arange( 0.1 , 5.1, 0.1)], 1).tolist()
+
+    def window_search_space(self):
+        """
+        The time window search space is used to calculate the sliding volatility 
+        """
+        #return range( 24 ,241, 24)
+        return range( 10 ,61, 5)  
+
+    def __init__ (self , data ):
+        self.data = data
         self.__data_size = self.__data.LogClose.size
-        #Optimize the return p_list starting from every item on the TS
-        #self.__p_list = [self.__p(0,k) for k in range( 0, self.__data_size )]
-        #retiring __2dplist
-        # __2dplist = []
-        # if p_list: 
-        #     for i in range(0, self.__data_size):
-        #         #p = [self.__p(i,k) for k in range( i, self.__data_size )]
-        #         # p = [ self.data.LogClose[k]-self.data.LogClose[i] \
-        #         #     for k in range( i, self.__data_size )]
-        #         p = np.subtract( np.array( self.data.LogClose[i:self.__data_size]), \
-        #         self.data.LogClose[i]).tolist()
-        #         print( "Plist:%d of %d"% (i, self.__data_size) )
-        #         __2dplist.append(p)
-        #     self.__p_list = __2dplist
-            # for l in __2dplist:
-            #     print(len(l), " elements: [" , ",".join( [str("{0:.2f}".format(i)) for i in l ]), "]"  )
-            #print("Done plist")
 
 
     def volatility( self, i, window = 5):
@@ -431,7 +437,7 @@ class Epsilon_Drawdown:
         v = np.array( self.volatility_spectrum() )
         return np.multiply( v, e0 ).tolist()
 
-    def potential_bubble(self, ntpk, threshold ):
+    def potential_bubble_points(self, ntpk, threshold ):
         """
         Potential long term bubble: Ntp,k>=DLT for k=1,...,Ntp
         Potential short term bubble: Ntp,k>=DST and k<DLT for k=1,...,Ntp.  Excluding potential long term 
@@ -445,6 +451,12 @@ class Epsilon_Drawdown:
             lst = [ x[0] for x in ntpk if x[1] >= self.__DLT ]
 
         return lst
+    
+    def get_bubbles (self, threshold ):
+        tp = self.tpeaks( plot = False )
+        ntpk = self.Ntpk( tp)
+        potential_bubbles = self.potential_bubble_points( ntpk, threshold )
+        return potential_bubbles
 
 class Lagrange_regularizer:
     """
@@ -562,23 +574,29 @@ class Lagrange_regularizer:
             _ssenReg.append(regLag)
         return _ssenReg
 
+def pipeline():
+    d = Data_Wrapper( hourly = True)
+    #Will modify wavelet to accept a series 
+    wavelet = Wavelet_Wrapper( d.data['close'].tolist()[-4096:] , padding = False)
+    for level in range(1, wavelet.coeffs_size):
+        plt.close('all')
+        recon = pd.DataFrame( wavelet.reconstruct( level ) , columns = ['LogClose'] )
+        # TODO bug this class depends on LogClose
+        l = Epsilon_Drawdown( recon )
+        l.data.LogClose.plot()
+        potential_bubbles = l.get_bubbles ( l.long_threshold )
+        draw_points = [(d, l.data.LogClose[d]) for d in potential_bubbles]
+        plt.scatter(*zip(*draw_points) )
+        plt.savefig("Bubblepoints-level-%2d.png" % level )
+        #plt.show()
 
 if __name__ == "__main__":
-    l = Epsilon_Drawdown( )
-    l.data.LogClose.plot()
-    tp = l.tpeaks( plot = False )
-    ntpk = l.Ntpk( tp)
-    potential_bubbles = l.potential_bubble( ntpk, l.long_threshold )
-    draw_points = [(d, l.data.LogClose[d]) for d in potential_bubbles]
+    pipeline()
+    # potential_bubbles = l.potential_bubble( ntpk, l.short_threshold )
+    # print(potential_bubbles)
+    # draw_points2 = [(d, l.data.LogClose[d]) for d in potential_bubbles]
+    # plt.scatter(*zip(*draw_points2) )
 
-    #plt.scatter(*zip(*draw_points) )
-
-    potential_bubbles = l.potential_bubble( ntpk, l.short_threshold )
-    print(potential_bubbles)
-    draw_points2 = [(d, l.data.LogClose[d]) for d in potential_bubbles]
-    plt.scatter(*zip(*draw_points2) )
-
-    plt.show()
     # l.plot_delta(1, 10)
     #deltas = l.plot_delta(1, 250)long_threshold
     #i1 = l.i1drawup(0)
@@ -587,8 +605,6 @@ if __name__ == "__main__":
     # print( l.data.PriceClose[i1])
     # /df = DataFrame(deltas)
     # l.plot_logreturns( 1, df.LogClose.size)
-    # plt.plot(l.data.LogClose)
-    # plt.show()
     #l.peaks()
     #l.peaks()
 
@@ -599,3 +615,24 @@ if __name__ == "__main__":
     # SSEL = l.obtainLagrangeRegularizedNormedCost(x, y, slope)
     # plt.plot(x, SSEL)
     # plt.show()
+
+
+#############################################################
+# Junk Code
+    #Optimize the return p_list starting from every item on the TS
+    #self.__p_list = [self.__p(0,k) for k in range( 0, self.__data_size )]
+    #retiring __2dplist
+    # __2dplist = []
+    # if p_list: 
+    #     for i in range(0, self.__data_size):
+    #         #p = [self.__p(i,k) for k in range( i, self.__data_size )]
+    #         # p = [ self.data.LogClose[k]-self.data.LogClose[i] \
+    #         #     for k in range( i, self.__data_size )]
+    #         p = np.subtract( np.array( self.data.LogClose[i:self.__data_size]), \
+    #         self.data.LogClose[i]).tolist()
+    #         print( "Plist:%d of %d"% (i, self.__data_size) )
+    #         __2dplist.append(p)
+    #     self.__p_list = __2dplist
+        # for l in __2dplist:
+        #     print(len(l), " elements: [" , ",".join( [str("{0:.2f}".format(i)) for i in l ]), "]"  )
+        #print("Done plist")

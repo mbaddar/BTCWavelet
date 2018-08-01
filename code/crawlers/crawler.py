@@ -56,9 +56,6 @@ class BaseCrawler (object):
         delta = datetime.strptime( date1, date_format) - datetime.strptime( date2, date_format)
         return delta.days
 
-    def today_midnight( self):
-        pass 
-
     def get_API (self, url):
         formatted_json = "error"
         resp_json = self.get_API_Json( url)
