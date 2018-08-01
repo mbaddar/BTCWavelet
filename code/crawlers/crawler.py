@@ -100,7 +100,6 @@ class BaseCrawler (object):
             data_list = json_data['Data']
             for item in data_list:
                 output.append( item[key])
-        #Converted to numpy.array for compatibility with wavelet module
         return output
 
     def json2ndarray(self, filename, key = 'close'):

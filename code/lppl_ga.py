@@ -4,15 +4,15 @@ from scipy.optimize import fmin_tnc
 import random
 import pandas as pd
 from pandas_datareader import data as pdr
-import fix_yahoo_finance as yf
-#yf.pdr_override() # <== that's all it takes :-)
 from pandas import Series, DataFrame
 import datetime
 import itertools
 from sklearn.metrics import mean_squared_error
-from epsilon import Data_Wrapper #Data crawler class 
 from sklearn import metrics
 from sklearn.cluster import KMeans
+
+from epsilon import Data_Wrapper, Epsilon_Drawdown
+from decomposition import Wavelet_Wrapper  
 
 #Nasdaq
 # daily_data = pd.read_csv( "Data/Stock/NASDAQCOM.csv", sep=',', index_col = 0, names=['Close'], header=None )
@@ -223,6 +223,25 @@ class Population:
         for i in range(num):
             reply.append(self.populous[i])
         return reply
+
+
+class Pipeline:
+    def do_pass ( self, level =1 ):
+        d = Data_Wrapper( hourly = True)
+        #Will modify wavelet to accept a series 
+        wavelet = Wavelet_Wrapper( d.data['LogClose'].tolist() , padding = False)
+        #for level in range(1, wavelet.coeffs_size):
+        # plt.close('all')
+        recon = pd.DataFrame( wavelet.reconstruct( level ) , columns = ['LogClose'] )
+        # TODO bug this class depends on LogClose
+        l = Epsilon_Drawdown( recon )
+        # l.data.LogClose.plot()
+        potential_bubbles = l.get_bubbles ( l.long_threshold )
+        draw_points = [(d, l.data.LogClose[d]) for d in potential_bubbles]
+        # plt.scatter(*zip(*draw_points) )
+        # plt.savefig("Bubblepoints-level-%2d.png" % level )
+        #plt.show()
+        return recon, draw_points
 
 def run( search = True):
     

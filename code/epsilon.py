@@ -18,6 +18,7 @@ from crawlers.crawler import Crawler
 from decomposition import Wavelet_Wrapper 
 
 date_format = "%Y-%m-%d %H:%M:%S"
+
 def get_days_between ( date1, date2):
     delta = datetime.strptime( date1, date_format) - datetime.strptime( date2, date_format)
     return delta.days
@@ -144,6 +145,19 @@ class Data_Wrapper:
         print( daily_data.head() )
         self.data = daily_data
         return daily_data
+
+    def save_to_file ( self, data, path, mode = "w+"):
+        try:
+            with open( path , mode) as f:
+                f.write( data )
+        except BaseException as e:
+            print(e)
+
+    def save_df ( self, df, path ):
+        try:
+            df.to_csv( path, sep='\t', encoding='utf-8' )
+        except BaseException as e:
+            print( e )
 
 class Epsilon_Drawdown:
     """
@@ -458,6 +472,25 @@ class Epsilon_Drawdown:
         potential_bubbles = self.potential_bubble_points( ntpk, threshold )
         return potential_bubbles
 
+
+class Pipeline:
+    def do_pass ( self, level =1 ):
+        d = Data_Wrapper( hourly = True)
+        #Will modify wavelet to accept a series 
+        wavelet = Wavelet_Wrapper( d.data['LogClose'].tolist() , padding = False)
+        #for level in range(1, wavelet.coeffs_size):
+        # plt.close('all')
+        recon = pd.DataFrame( wavelet.reconstruct( level ) , columns = ['LogClose'] )
+        # TODO bug this class depends on LogClose
+        l = Epsilon_Drawdown( recon )
+        # l.data.LogClose.plot()
+        potential_bubbles = l.get_bubbles ( l.long_threshold )
+        draw_points = [(d, l.data.LogClose[d]) for d in potential_bubbles]
+        plt.scatter(*zip(*draw_points) )
+        plt.savefig("Bubblepoints-level-%2d.png" % level )
+        #plt.show()
+
+
 class Lagrange_regularizer:
     """
     Copyright: G.Demos @ ETH-Zurich - Jan.2017
@@ -574,24 +607,8 @@ class Lagrange_regularizer:
             _ssenReg.append(regLag)
         return _ssenReg
 
-def pipeline():
-    d = Data_Wrapper( hourly = True)
-    #Will modify wavelet to accept a series 
-    wavelet = Wavelet_Wrapper( d.data['close'].tolist()[-4096:] , padding = False)
-    for level in range(1, wavelet.coeffs_size):
-        plt.close('all')
-        recon = pd.DataFrame( wavelet.reconstruct( level ) , columns = ['LogClose'] )
-        # TODO bug this class depends on LogClose
-        l = Epsilon_Drawdown( recon )
-        l.data.LogClose.plot()
-        potential_bubbles = l.get_bubbles ( l.long_threshold )
-        draw_points = [(d, l.data.LogClose[d]) for d in potential_bubbles]
-        plt.scatter(*zip(*draw_points) )
-        plt.savefig("Bubblepoints-level-%2d.png" % level )
-        #plt.show()
-
 if __name__ == "__main__":
-    pipeline()
+    Pipeline().do_pass()
     # potential_bubbles = l.potential_bubble( ntpk, l.short_threshold )
     # print(potential_bubbles)
     # draw_points2 = [(d, l.data.LogClose[d]) for d in potential_bubbles]
