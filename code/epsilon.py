@@ -50,10 +50,14 @@ class Data_Wrapper:
     def data(self, data):
         self.__data = data
 
-    @property #getter only
+    @property 
     def data_size(self):
         return self.__data_size
-        
+    @data_size.setter
+    def data_size(self, data_size):
+        self.__data_size = data_size
+    
+
     def __init__ (self, hourly = True):
         
         self.lppl_data = None 
@@ -92,9 +96,25 @@ class Data_Wrapper:
         # Reversed data 
         close = [daily_data.Close[-i] for i in range(1,len(daily_data.Close)+1)]
         dataSeries = [time, close]
-        self.__data_size = dataSeries[0].size
-        return dataSeries
 
+        self.data = daily_data
+        self.data_size = dataSeries[0].size
+        return dataSeries
+    
+    def get_data_series( self, index =0, direction = -1):
+        """
+        Direction: +/- 1
+        """
+        if direction not in [-1,1]:
+            direction = 1 #Should raise some error 
+        data = self.data['LogClose'][index:] 
+        data_size = data.size 
+        #time = np.linspace( 0, data_size-1, data_size) #just a sequence 
+        time = np.arange( data_size )
+        # Reversed data if direction is -1 
+        close = [ data[ np.sign( direction) * i] for i in range( -direction , data_size -direction )]
+        dataSeries = [time, close]
+        return dataSeries
 
     def get_hourly_data( self, path = "2018"):
         
@@ -197,6 +217,8 @@ class Epsilon_Drawdown:
         This is to incorporate the dynamics of realized return volatility
         in calculating the stopping tolerance for the drawups/downs
         """
+
+        #Round to 1 decimal place
         return np.around( [i for i in np.arange( 0.1 , 5.1, 0.1)], 1).tolist()
         #return np.around( [i for i in np.arange( 0.1 , 5.1, 0.1)], 1).tolist()
 
@@ -204,8 +226,8 @@ class Epsilon_Drawdown:
         """
         The time window search space is used to calculate the sliding volatility 
         """
-        #return range( 24 ,241, 24)
-        return range( 10 ,61, 5)  
+        return range( 12 ,241, 12) #20 different volatility windows 
+        #return range( 10 ,61, 5) #Daily 
 
     def __init__ (self , data ):
         self.data = data
@@ -225,7 +247,6 @@ class Epsilon_Drawdown:
         vol = window_data.std()
         return 0.01 if np.isnan(vol) else vol
 
-
     def epsilon (self, e0, i, w):
         """
         Calculate the stop tolerance Epsilon E(e0,w)=e0*volatility(i, w)
@@ -234,6 +255,7 @@ class Epsilon_Drawdown:
 
     def get_peaks(self):
         epsilon_list = []
+        #Grid search for different e0 and time windows
         for e0,w in [ (x,y) for x in self.e0_search_space() for y in self.window_search_space() ]:
             epsilon = (e0,w, self.epsilon( e0, w, w))
             epsilon_list.append( epsilon  )
@@ -342,7 +364,7 @@ class Epsilon_Drawdown:
         while i < self.data_size-1: #find if a drawup or drawdown
             # print("Found ", ("drawup " if drawup else "drawdown "), "at ", str(i1))
             draws.append(i1)
-            breaks.append(br)
+            #breaks.append(br)
             # Increment and flip drawup
             i=i1+1
             if i==self.data_size:
@@ -354,22 +376,23 @@ class Epsilon_Drawdown:
         peaks = [draws[d] for d in range( (0 if first_drawup else 1) ,len(draws),2) ]
         
         if plot:
-            plt.plot(self.data.LogClose)
-            draw_points = [(d, self.data.LogClose[d]) for d in draws]
+            #plt.plot(self.data.LogClose)
+            #draw_points = [(d, self.data.LogClose[d]) for d in draws]
             #break_points = [(d, l.data.LogClose[d]) for d in breaks]
             # z = zip(*draw_points)
             # x= zip(*break_points)
             # plt.scatter(*z, color='blue')
             # plt.scatter(*x, color='red')
             # Peaks start from 0 for a drawup rally and from 1 for a drawdown rally
-            draw_points = [(d, self.data.LogClose[d]) for d in peaks]
-            z = zip(*draw_points)
+            #draw_points = [(d, self.data.LogClose[d]) for d in peaks]
+            #z = zip(*draw_points)
             #colors = cm.rainbow(np.linspace(0, 1, 100)
             #colors = itertools.cycle(["r", "b", "g"])
-            plt.scatter(*z) #plot with random color
+            #plt.scatter(*z) #plot with random color
             #plt.scatter(*z, c = np.random.rand(3,1)) #plot with random color
             #show later
             #plt.show()
+            pass
         return peaks
 
     def tpeaks(self, plot = False  ):
@@ -377,19 +400,20 @@ class Epsilon_Drawdown:
         For each epsilon window pair find a list of peaks.
         Loop over threshold spectrum for each e0 from the e0_search_space() 
         Returns a 2-d list of peaks for each e0 and each window
+        tp is estimated over a moving window of the past w time points
         """
         e0_space = self.e0_search_space()
         tpeaks =[]
         window_space = self.window_search_space()
-        for e0 in e0_space: #50 runs
+        for e0 in e0_space: 
             ts = self.threshold_spectrum( e0)
             then = time.time()
-            for window in range( len(window_space)) : #11 runs
+            for window in range( len(window_space)) : 
                 peaks = self.peaks( epsilon = ts[window], plot = plot ) #Supports sliding window
                 tpeaks.append(peaks)
-                print("Window run: %.3f sec" % (time.time() - then) )
+                print("Window %d run: %.3f sec" % (window, time.time() - then) )
                 then = time.time()
-            print("e0 run")
+            print("e0 run: ", e0)
         if plot:
             plt.show()
         return tpeaks
@@ -470,25 +494,8 @@ class Epsilon_Drawdown:
         tp = self.tpeaks( plot = False )
         ntpk = self.Ntpk( tp)
         potential_bubbles = self.potential_bubble_points( ntpk, threshold )
-        return potential_bubbles
-
-
-class Pipeline:
-    def do_pass ( self, level =1 ):
-        d = Data_Wrapper( hourly = True)
-        #Will modify wavelet to accept a series 
-        wavelet = Wavelet_Wrapper( d.data['LogClose'].tolist() , padding = False)
-        #for level in range(1, wavelet.coeffs_size):
-        # plt.close('all')
-        recon = pd.DataFrame( wavelet.reconstruct( level ) , columns = ['LogClose'] )
-        # TODO bug this class depends on LogClose
-        l = Epsilon_Drawdown( recon )
-        # l.data.LogClose.plot()
-        potential_bubbles = l.get_bubbles ( l.long_threshold )
-        draw_points = [(d, l.data.LogClose[d]) for d in potential_bubbles]
-        plt.scatter(*zip(*draw_points) )
-        plt.savefig("Bubblepoints-level-%2d.png" % level )
-        #plt.show()
+        points = [(d, self.data.LogClose[d]) for d in potential_bubbles]
+        return points
 
 
 class Lagrange_regularizer:
@@ -608,7 +615,7 @@ class Lagrange_regularizer:
         return _ssenReg
 
 if __name__ == "__main__":
-    Pipeline().do_pass()
+    pass
     # potential_bubbles = l.potential_bubble( ntpk, l.short_threshold )
     # print(potential_bubbles)
     # draw_points2 = [(d, l.data.LogClose[d]) for d in potential_bubbles]
@@ -634,8 +641,7 @@ if __name__ == "__main__":
     # plt.show()
 
 
-#############################################################
-# Junk Code
+################# Junk Code ############################
     #Optimize the return p_list starting from every item on the TS
     #self.__p_list = [self.__p(0,k) for k in range( 0, self.__data_size )]
     #retiring __2dplist

@@ -37,6 +37,7 @@ from decomposition import Wavelet_Wrapper
 # d = Data_Wrapper()
 # DataSeries = d.get_lppl_data()
 
+
 def lppl (t,x): #return fitting result using LPPL parameters
     a = x[0]
     b = x[1]
@@ -49,7 +50,6 @@ def lppl (t,x): #return fitting result using LPPL parameters
         return a + ( b*np.power( np.abs(tc-t), m) ) *(1 + (c*np.cos((w*np.log( np.abs( tc-t ) ))+phi)))
     except BaseException:
         print( "(tc=%d,t=%d)"% (tc,t) )
-
 
 
 class Individual:
@@ -226,26 +226,94 @@ class Population:
 
 
 class Pipeline:
+    @property
+    def data_wrapper(self):
+        return self.__data_wrapper
+    @data_wrapper.setter
+    def data_wrapper( self, data_wrapper):
+        self.__data_wrapper = data_wrapper
+
+    def __init__ (self, data_Wrapper):
+        self.data_wrapper = data_Wrapper
+
     def do_pass ( self, level =1 ):
-        d = Data_Wrapper( hourly = True)
         #Will modify wavelet to accept a series 
-        wavelet = Wavelet_Wrapper( d.data['LogClose'].tolist() , padding = False)
+        wavelet = Wavelet_Wrapper( self.data_wrapper.data['LogClose'].tolist() , padding = False)
         #for level in range(1, wavelet.coeffs_size):
         # plt.close('all')
         recon = pd.DataFrame( wavelet.reconstruct( level ) , columns = ['LogClose'] )
         # TODO bug this class depends on LogClose
         l = Epsilon_Drawdown( recon )
         # l.data.LogClose.plot()
-        potential_bubbles = l.get_bubbles ( l.long_threshold )
-        draw_points = [(d, l.data.LogClose[d]) for d in potential_bubbles]
+        potential_bubble_points = l.get_bubbles ( l.long_threshold )
         # plt.scatter(*zip(*draw_points) )
         # plt.savefig("Bubblepoints-level-%2d.png" % level )
         #plt.show()
-        return recon, draw_points
+        return recon, potential_bubble_points
+
+    def model_lppl ( self, dataSeries ):
+        data_size = dataSeries[0].size
+        # dt = data_size - step
+        limits = (
+            [1, 300],     # A :
+            [-100, -0.1],     # B :
+            [data_size, 2*data_size],     # Critical Time : between the end of the TS part and 1 length away 
+            [0.01, .999],       # m :
+            [-1, 1],        # c :
+            [4, 25],       # omega
+            #[12, 25],       # omega
+            [0, 2 * np.pi]  # phi : up to 8.83
+        )
+
+        x = Population( limits, 20, 0.3, 1.5, .05, 4, \
+        [ dataSeries[0], dataSeries[1] ] )
+        for _ in range(2):
+            x.Fitness()
+            x.Eliminate()
+            x.Mate()
+            x.Mutate()
+
+        x.Fitness()
+        values = x.BestSolutions(3)
+        wrappers = []
+        if values:
+            for x in values:
+                print(x.PrintIndividual())
+                model = [ x.cof[i] for i in range(7)]
+                wrappers.append( Lppl_Wrapper( model, x.fit ) )
+        else:
+            print("No values")
+        return wrappers[0] #The first fit model
 
 def run( search = True):
+    d = Data_Wrapper( hourly = True)
+    pl = Pipeline( d )
+    data_size = pl.data_wrapper.data_size
+    points = []
+    plt.plot( d.data['LogClose'])
+    for step in range(0, data_size-240,12 ): #skip 12 time points and recalculate
+        # respective minimum and maximum values ​​of the seven parameters fitting process
+        data_series = d.get_data_series( index = step, direction = 1) 
+        dt = data_series[0].size
+        lppl = pl.model_lppl( data_series)
+        print("Step: %d, dt: %d" % (step, dt))
+        #x = lppl.Population(limits, 20, 0.3, 1.5, .05, 4)
+        points.append( (lppl.tc-dt, dt ) )
+        lppl.plot( data_series[0])
+    plt.show(block=True)
+    # plt.scatter( *zip( *points) )
+    # plt.gca().set_xlabel('tc-t2')
+    # plt.gca().set_ylabel('dt = t2-t1')
+    # clusters, labels = cluster(points, 4)
+    # plt.scatter( *zip( *clusters) )
+    # plt.show(block=True)
+    # print( metrics.silhouette_score(points, labels) )
+    # print ( "Clusters: ", clusters )
+
+def run1( search = True):
+    # Get hourly data
     
-    d = Data_Wrapper()
+    d = Data_Wrapper( hourly = True)
     t1 = "2017-03-24 00:00:00"
     t2 = "2017-05-25 00:00:00"
     dataSeries = d.get_lppl_data(date_from= t1, date_to = t2)
@@ -369,12 +437,6 @@ class Lppl_Wrapper:
 
 if __name__ == "__main__":
 
-    # data = pd.read_csv("Data/lppl_fit.csv", header=0)
-    # data = data.set_index('Date')
-    # data['Fit1'] = data['Fit1'].apply(lambda x: np.exp(x) )
-    # data['Fit2'] = data['Fit2'].apply(lambda x: np.exp(x) )
-    # data['Fit3'] = data['Fit3'].apply(lambda x: np.exp(x) )
-    # data.Fit2.plot(figsize=(14,8))
     # plt.show(block=True)
     random.seed()
     run()
