@@ -32,7 +32,12 @@ def get_date_from_epoch( epoch):
     t = datetime(t1.tm_year, t1.tm_mon, t1.tm_mday, t1.tm_hour, t1.tm_min, t1.tm_sec)
     str_time = t.strftime( date_format )
     return str_time
-    
+
+def get_epoch( date):
+    utc_time = datetime.strptime( date, date_format)
+    epoch_time = (utc_time - datetime(1970, 1, 1)).total_seconds()
+    return int( np.round( epoch_time))
+
 class Data_Wrapper:
     @property
     def lppl_data(self):
@@ -101,18 +106,22 @@ class Data_Wrapper:
         self.data_size = dataSeries[0].size
         return dataSeries
     
-    def get_data_series( self, index =0, direction = -1):
+    def get_data_series( self, index =0, to = -1, direction = -1):
         """
         Direction: +/- 1
         """
         if direction not in [-1,1]:
             direction = 1 #Should raise some error 
-        data = self.data['LogClose'][index:] 
+        data = np.array( self.data['LogClose'][index: to] if to>-1 else self.data['LogClose'][index:] ) 
         data_size = data.size 
         #time = np.linspace( 0, data_size-1, data_size) #just a sequence 
         time = np.arange( data_size )
         # Reversed data if direction is -1 
-        close = [ data[ np.sign( direction) * i] for i in range( -direction , data_size -direction )]
+        # if direction == 1:
+        #     close = [ data[ i] for i in range( 0 , data_size ) ]
+        # else:
+        #     close = [ data[ -i] for i in range( 1 , data_size + 1 )]
+        close = (data if direction==1 else np.flip(data, axis=0) )
         dataSeries = [time, close]
         return dataSeries
 
@@ -125,10 +134,22 @@ class Data_Wrapper:
         hourly_data['LogClose'] = hourly_data['close'].apply( lambda x: np.log(x) )
         hourly_data.columns = ['date', 'close', 'LogClose']
         hourly_data['StrDate'] = hourly_data['date'].apply( lambda epoch: get_date_from_epoch( epoch) )
-        print( hourly_data.head() )
         self.data = hourly_data
         self.__data_size = hourly_data.LogClose.size 
         return hourly_data
+
+    def filter_by_date(self, date_from, date_to):
+        """
+        Example date: 2017-09-17 11:00:00
+        """
+        df = self.data
+        print(df['date'].size)        
+        df = df.loc[ df['date'] >= get_epoch( date_from) ]
+        df = df.loc[ df['date'] <= get_epoch( date_to) ]
+        df = df.reset_index()
+        df = df.drop(['index'], axis=1)
+        self.data = df
+        self.data_size = df['date'].size
 
     def get_test_data(self):
         #Test data
@@ -179,6 +200,12 @@ class Data_Wrapper:
         except BaseException as e:
             print( e )
 
+if __name__ == "__main__":
+    d = Data_Wrapper()
+    d.filter_by_date( "2017-12-1 00:00:00", "2018-1-10 00:00:00")
+    print(d.data.head())
+
+
 class Epsilon_Drawdown:
     """
     Epsilon Drawdown Method developed by Johansen and Sornette (1998, 2001)
@@ -219,7 +246,8 @@ class Epsilon_Drawdown:
         """
 
         #Round to 1 decimal place
-        return np.around( [i for i in np.arange( 0.1 , 5.1, 0.1)], 1).tolist()
+        return np.around( [i for i in np.arange( 2.0 , 2.1, 0.1)], 1).tolist()
+        # return np.around( [i for i in np.arange( 0.1 , 2.1, 0.1)], 1).tolist()
         #return np.around( [i for i in np.arange( 0.1 , 5.1, 0.1)], 1).tolist()
 
     def window_search_space(self):
@@ -614,8 +642,8 @@ class Lagrange_regularizer:
             _ssenReg.append(regLag)
         return _ssenReg
 
-if __name__ == "__main__":
-    pass
+# if __name__ == "__main__":
+#     pass
     # potential_bubbles = l.potential_bubble( ntpk, l.short_threshold )
     # print(potential_bubbles)
     # draw_points2 = [(d, l.data.LogClose[d]) for d in potential_bubbles]

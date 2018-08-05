@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import fmin_tnc
+from scipy.optimize import fmin_tnc, least_squares
 import random
 import pandas as pd
 from pandas_datareader import data as pdr
@@ -14,42 +14,6 @@ from sklearn.cluster import KMeans
 from epsilon import Data_Wrapper, Epsilon_Drawdown
 from decomposition import Wavelet_Wrapper  
 
-#Nasdaq
-# daily_data = pd.read_csv( "Data/Stock/NASDAQCOM.csv", sep=',', index_col = 0, names=['Close'], header=None )
-# daily_data['Close'] = daily_data['Close'].apply( lambda x: np.nan if x=='.' else float(x) )
-# # Lppl works on log prices
-# daily_data['Close'] = daily_data['Close'].apply( lambda x: np.log(x) )
-# # Remove nan values
-# daily_data = daily_data [  np.isnan(daily_data['Close'])==False  ]
-# date = sz.index
-
-# time = np.linspace(0, len(sz)-1, len(sz))
-# close = [sz.Close[i] for i in range(len(sz.Close))]
-# print(sz.Close.describe() )
-
-# plt.plot(DataSeries[0], DataSeries[1])
-# plt.show()
-# # sz = get_price(order_book_ids='159915.XSHE',start_date='20140101',end_date='20150610',fields="ClosingPx")
-# date = sz.index
-# time = np.linspace(0, len(sz)-1, len(sz))
-# close = np.array(np.log(sz))
-# DataSeries = [time, close]
-# d = Data_Wrapper()
-# DataSeries = d.get_lppl_data()
-
-
-def lppl (t,x): #return fitting result using LPPL parameters
-    a = x[0]
-    b = x[1]
-    tc = x[2]
-    m = x[3]
-    c = x[4]
-    w = x[5]
-    phi = x[6]
-    try:
-        return a + ( b*np.power( np.abs(tc-t), m) ) *(1 + (c*np.cos((w*np.log( np.abs( tc-t ) ))+phi)))
-    except BaseException:
-        print( "(tc=%d,t=%d)"% (tc,t) )
 
 
 class Individual:
@@ -66,10 +30,12 @@ class Individual:
         """
         The fitness function returns the SSE between lppl and the log price list
         """
-        lppl_values = lppl( self.data_series[0],x)
+        lppl_values = lppl( self.data_series[0], x)
         #lppl_values = [lppl(t,x) for t in DataSeries[0]]
         #actuals = DataSeries[1]
-        delta = np.subtract( lppl_values, self.data_series[1])
+        delta = np.subtract( lppl_values, self.data_series[1] )
+        # print("Lppl values: ", self.data_series[1])
+        # print("Data: ", lppl_values)
         delta = np.power( delta, 2)
         sse = np.sum( delta) #SSE
         return sse
@@ -136,7 +102,7 @@ class Population:
 
     LOOP_MAX = 500
 
-    def __init__ (self, limits, size, eliminate, mate, probmutate, vsize, data_series ):
+    def __init__ (self, limits, size, eliminate, mate, probmutate, vsize, data_series, verbose = False ):
         'seeds the population'
         'limits is a tuple holding the lower and upper limits of the cofs'
         'size is the size of the seed population'
@@ -147,6 +113,7 @@ class Population:
         self.probmutate = probmutate
         self.fitness = []
         self.data_series = data_series
+        self.verbose = verbose 
         for _ in range(size):
             SeedCofs = [ random.uniform(a[0], a[1]) for a in limits ]
             self.populous.append(Individual(SeedCofs , limits, data_series ))
@@ -173,18 +140,20 @@ class Population:
                 false += 1
                 self.populous.remove(individual)
         self.SetFitness()
-        print("\n fitness out size: " + str(len(self.populous)) + " " + str(false))
+        if self.verbose:
+            print("\n fitness out size: " + str(len(self.populous)) + " " + str(false))
 
     def Eliminate(self):
         a = len(self.populous)
         self.populous.sort(key=lambda ind: ind.fit)
         while (len(self.populous) > self.size * self.eliminate):
             self.populous.pop()
-        print("Eliminate: " + str(a- len(self.populous)))
+        if self.verbose:
+            print("Eliminate: " + str(a- len(self.populous)))
 
     def Mate(self):
         counter = 0
-        if not self.populous:
+        if not self.populous and self.verbose:
             print("Empty populous")
         while ( self.populous and len(self.populous) <= self.mate * self.size):
             counter += 1
@@ -196,13 +165,14 @@ class Population:
                             np.amin(self.fitness), 
                             np.amax(self.fitness) - np.amin(self.fitness)) ):
                 self.populous.append(i.mate(j))
-            if (counter > Population.LOOP_MAX):
+            if counter > Population.LOOP_MAX and self.verbose:
                 print("loop broken: mate")
                 while (len(self.populous) <= self.mate * self.size):
                     i = self.populous[random.randint(0, len(self.populous)-1)]
                     j = self.populous[random.randint(0, len(self.populous)-1)]
                     self.populous.append(i.mate(j))
-        print("Mate Loop complete: " + str(counter))
+        if self.verbose:
+            print("Mate Loop complete: " + str(counter))
 
     def Mutate(self):
         counter = 0
@@ -211,7 +181,8 @@ class Population:
                 ind.mutate()
                 ind.fitness()
                 counter +=1
-        print("Mutate: " + str(counter))
+        if self.verbose:
+            print("Mutate: " + str(counter))
         self.SetFitness()
 
     def BestSolutions(self, num):
@@ -238,10 +209,13 @@ class Pipeline:
 
     def do_pass ( self, level =1 ):
         #Will modify wavelet to accept a series 
-        wavelet = Wavelet_Wrapper( self.data_wrapper.data['LogClose'].tolist() , padding = False)
+        if level > 0:
+            wavelet = Wavelet_Wrapper( self.data_wrapper.data['LogClose'].tolist() , padding = False)
         #for level in range(1, wavelet.coeffs_size):
         # plt.close('all')
-        recon = pd.DataFrame( wavelet.reconstruct( level ) , columns = ['LogClose'] )
+            recon = pd.DataFrame( wavelet.reconstruct( level ) , columns = ['LogClose'] )
+        else:
+            recon = self.data_wrapper.data
         # TODO bug this class depends on LogClose
         l = Epsilon_Drawdown( recon )
         # l.data.LogClose.plot()
@@ -255,12 +229,12 @@ class Pipeline:
         data_size = dataSeries[0].size
         # dt = data_size - step
         limits = (
-            [1, 300],     # A :
+            [1, 1000],     # A :
             [-100, -0.1],     # B :
             [data_size, 2*data_size],     # Critical Time : between the end of the TS part and 1 length away 
             [0.01, .999],       # m :
             [-1, 1],        # c :
-            [4, 25],       # omega
+            [6, 13],       # omega
             #[12, 25],       # omega
             [0, 2 * np.pi]  # phi : up to 8.83
         )
@@ -283,33 +257,314 @@ class Pipeline:
                 wrappers.append( Lppl_Wrapper( model, x.fit ) )
         else:
             print("No values")
-        return wrappers[0] #The first fit model
+        return wrappers #The first fit model
+        #return wrappers[0] #The first fit model
 
-def run( search = True):
+def run( Test = False ):
     d = Data_Wrapper( hourly = True)
+    d.filter_by_date( "2017-12-1 00:00:00", "2018-1-10 00:00:00")
     pl = Pipeline( d )
-    data_size = pl.data_wrapper.data_size
-    points = []
-    plt.plot( d.data['LogClose'])
-    for step in range(0, data_size-240,12 ): #skip 12 time points and recalculate
-        # respective minimum and maximum values ​​of the seven parameters fitting process
-        data_series = d.get_data_series( index = step, direction = 1) 
-        dt = data_series[0].size
-        lppl = pl.model_lppl( data_series)
-        print("Step: %d, dt: %d" % (step, dt))
-        #x = lppl.Population(limits, 20, 0.3, 1.5, .05, 4)
-        points.append( (lppl.tc-dt, dt ) )
-        lppl.plot( data_series[0])
-    plt.show(block=True)
-    # plt.scatter( *zip( *points) )
-    # plt.gca().set_xlabel('tc-t2')
-    # plt.gca().set_ylabel('dt = t2-t1')
-    # clusters, labels = cluster(points, 4)
-    # plt.scatter( *zip( *clusters) )
-    # plt.show(block=True)
-    # print( metrics.silhouette_score(points, labels) )
-    # print ( "Clusters: ", clusters )
 
+    #TODO Get bubble points. Uncomment
+    # data, bubble_points = pl.do_pass (level = 0) 
+    # #Add reconstructed data
+    # d.data = data
+    # print( bubble_points )
+    plt.plot( d.data['LogClose'])
+    # plt.scatter( *zip(*bubble_points) )
+    # print("Bubble points size: ", len(bubble_points) )
+
+    #for i in range( 1, len(bubble_points ) ):
+    for i in range( 1, 2 ):
+        _to = 200
+        _from = 1
+        # _to = bubble_points[i][0]
+        # _from = bubble_points[i-1][0]
+        print("Fitting data from peak point %d to point %d " % (_from, _to) )
+        data_size = _to - _from + 1
+        points = []
+        # for step in range(0, data_size-240,12 ): #skip 12 time points and recalculate
+        #TODO test range. Use the above 
+        if data_size > 48:
+            print("Data size:", data_size )
+            #for step in range( 0, data_size - 24, 12 ): #skip 12 time points and recalculate
+            for step in [0]: 
+            #for step in range(0, data_size - 240, 12 ): #skip 12 time points and recalculate
+                # respective minimum and maximum values ​​of the seven parameters fitting process
+                data_series = d.get_data_series( index = _from+ step, to=_to,  direction = 1) 
+                dt = data_series[0].size
+                lppl = pl.model_lppl( data_series ) # returns 3 fits
+                print("Step: %d, dt: %d" % (step, dt))
+                #x = lppl.Population(limits, 20, 0.3, 1.5, .05, 4)
+                points.append( (lppl[0].tc-dt, dt ) )
+                for i in range(3):
+                    lppl[i].plot( data_series[0], offset = step + _from )
+    plt.show(block=True)
+        # plt.scatter( *zip( *points) )
+        # plt.gca().set_xlabel('tc-t2')
+        # plt.gca().set_ylabel('dt = t2-t1')
+        # clusters, labels = cluster(points, 4)
+        # plt.scatter( *zip( *clusters) )
+        # plt.show(block=True)
+        # print( metrics.silhouette_score(points, labels) )
+        # print ( "Clusters: ", clusters )
+
+
+def cluster (points, n_clusters =2 ):
+    kmeans = KMeans(init='k-means++', n_clusters= n_clusters, n_init=10).fit(points)
+    return kmeans.cluster_centers_, kmeans.labels_
+
+
+class Lppl_Wrapper:
+
+    @property
+    def sse(self):
+        return self.__sse
+
+    @sse.setter
+    def sse(self, sse):
+        self.__sse = sse
+
+    @property
+    def model(self):
+        return self.__model
+
+    @model.setter
+    def model(self, model):
+        self.__model = model
+
+    def __init__ ( self, model, sse):
+        self.__model = model       
+        self.__sse = sse 
+        self.__tc = model[2]
+
+    @property
+    def tc(self):
+        return self.__tc
+
+    def generator (self, ts): #return fitting result using LPPL parameters
+        """
+        ts is a numpy array of time points starting from 0
+        """
+        #TODO check for errors. E.g. empty model
+        #TODO equation needs review. phi or -phi? B and C are different from the paper 
+        #TODO isert b inside the cos upper bracket 
+        x = self.model
+
+        # a = x[0]
+        # b = x[1]
+        # tc = x[2]
+        # m = x[3]
+        # c = x[4]
+        # w = x[5]
+        # phi = x[6]
+        # try:
+        #     yield a + ( b*np.power( np.abs(tc-ts), m) ) *( 1 + ( c*np.cos((w*np.log( np.abs( tc-ts)))+ phi)))
+        # except BaseException:
+        #     print( "(tc=%d,t=%d)"% (tc,ts) )
+        values = lppl(ts, x)
+        return values 
+
+    def plot(self, ts, offset=0):
+        # Offset is to plot it on a full TS 
+        #plt.plot(ts + offset , list( self.generator(ts)[0] )  )
+        ts = ts + offset
+        print("plotting ts from point: ", ts[0])
+        plt.plot(ts , list( self.generator(ts) )  )
+
+def lppl (t,x): #return fitting result using LPPL parameters
+    a = x[0]
+    b = x[1]
+    tc = x[2]
+    m = x[3]
+    c = x[4]
+    w = x[5]
+    phi = x[6]
+    try:
+        # return a + ( b*np.power( np.abs(tc-t), m) ) *(1 + ( c*np.cos((w*np.log( np.abs( tc-t ) ))+phi)))
+        return a + ( np.power( tc-t, m)) *\
+               ( b + ( c * np.cos((w*np.log(  tc-t  ))-phi)) )
+    except BaseException:
+        print( "(tc=%d,t=%d)"% (tc,t) )
+
+def lpplc1 (t,x): #return fitting result using LPPL parameters
+    a = x[0] 
+    b = x[1]
+    tc = x[2]
+    m = x[3]
+    c1 = x[4]
+    w = x[5]
+    c2 = x[6]
+    try:
+        # return a + ( b*np.power( np.abs(tc-t), m) ) *(1 + ( c*np.cos((w*np.log( np.abs( tc-t ) ))+phi)))
+        pwr = np.power( tc-t, m)
+        fun = a + pwr * (b  + c1 * np.cos( ( w*np.log( tc-t ))) + c2 * np.sin( ( w*np.log( tc-t ))) )
+        return fun
+    except BaseException:
+        print( "(tc=%d,t=%d)"% (tc,t) )
+
+def lppl_res (x, t, y): #return fitting result using LPPL parameters
+    """
+    t and y must have the same dimensions
+    """
+    try:
+        return lppl(t, x) - y
+    except BaseException:
+        print( "(tc=%d,t=%d)"% (x[2],t) )
+
+search_ranges = {
+    'm': np.linspace(0.1,.9, 100),
+    'w': np.linspace( 6,13, 100)
+}
+
+class Grid_Fit:
+    @property
+    def d(self):
+        return self.__d
+    @d.setter
+    def d(self, d):
+        self.__d = d
+
+    @property
+    def data_series(self):
+        return self.__data_series
+    @data_series.setter
+    def data_series(self, data_series):
+        self.__data_series = data_series
+    
+    def __init__(self):
+        d = Data_Wrapper( hourly = True)
+        d.filter_by_date( "2017-11-01 00:00:00", "2017-12-17 00:00:00")
+        self.d = d
+        self.data_series = d.get_data_series()
+
+
+    def fi(self, tc, t, m):
+        """
+        Used for the matrix analytic solution of the linear parameters
+        """
+        return np.power( tc-t, m)
+
+    def sum_fi(self, tc, m):
+        return np.sum( np.power( tc-self.data_series[0], m) )  
+    def sum_gi (self, tc, m, w ):
+        t = self.data_series[0]
+        return np.sum( np.multiply( np.power( tc-t, m), np.cos( ( w*np.log( tc-t ))) ) )
+    def sum_hi( self, tc, m, w ):
+        t = self.data_series[0]
+        return np.sum( np.multiply( np.power( tc-t, m) , np.cos( ( w*np.log( tc-t ))) ) )
+
+    def sum_fi_square(self, tc, m):
+        t = self.data_series[0]
+        return np.sum( np.power( tc-t, 2*m) )  
+    def sum_gi_square (self, tc, m, w ):
+        t = self.data_series[0]
+        return np.sum( np.power( np.multiply( np.power( tc-t, m), np.cos( ( w*np.log( tc-t ))) ), 2 ) )
+    def sum_hi_square ( self, tc, m, w ):
+        t = self.data_series[0]
+        return np.sum( np.power( np.multiply( np.power( tc-t, m) , np.cos( ( w*np.log( tc-t ))) ),2 ) )
+
+    def sum_yi(self):
+        t = self.data_series[0]
+        return np.sum( self.data_series[1] )
+    def sum_yi_fi(self, tc, m):
+        t = self.data_series[0]
+        return np.sum( np.multiply( self.data_series[1], np.power( tc-self.data_series[0], m) ) )  
+    def sum_yi_gi(self, tc, m, w):
+        t = self.data_series[0]
+        return np.sum( np.multiply( self.data_series[1], np.multiply( np.power( tc-t, m), np.cos( ( w*np.log( tc-t ))) ) ) )  
+    def sum_yi_hi(self, tc, m, w):
+        t = self.data_series[0]
+        return np.sum( np.multiply( self.data_series[1], np.multiply( np.power( tc-t, m) , np.cos( ( w*np.log( tc-t ))) ) ) )  
+
+    def sum_fi_gi(self, tc, m, w):
+        t = self.data_series[0]
+        return np.sum( np.multiply( np.power( tc-self.data_series[0], m), np.multiply( np.power( tc-t, m), np.cos( ( w*np.log( tc-t ))) ) ) )  
+    def sum_gi_hi (self, tc, m, w ):
+        t = self.data_series[0]
+        return np.sum( np.multiply( np.multiply( np.power( tc-t, m), np.cos( ( w*np.log( tc-t ))) ) ), np.multiply( np.power( tc-t, m) , np.cos( ( w*np.log( tc-t ))) ) )
+    def sum_fi_hi( self, tc, m, w ):
+        t = self.data_series[0]
+        return np.sum( np.multiply ( np.power( tc-self.data_series[0], 2*m), np.multiply( np.power( tc-t, m) , np.cos( ( w*np.log( tc-t ))) ) ) )
+    
+
+    def fit_linear_params (self, tc, m, w):
+        """
+        Fits A, B, C1, C2 according to an analytic solution given tc, m, w
+        Returns a vector of A, B, C1, C2
+        """
+        from numpy.linalg import inv
+        b = np.array( [self.sum_yi(), self.sum_yi_fi(tc, m), self.sum_yi_gi (tc, m, w), self.sum_yi_gi (tc, m, w) ] ).T
+        # Summetric 
+        a = inv( np.array( [ self.d.data_size, self.sum_fi(tc, m), self.sum_gi( tc, m, w), self.sum_hi( tc, m, w)],
+                           [self.sum_fi( tc, m), self.sum_fi_square(tc, m), self.sum_fi_gi(tc, m, w), self.sum_fi_hi(tc, m, w)],
+                           [self.sum_gi(tc, m, w), self.sum_fi_gi(tc, m, w), self.sum_gi_square( tc, m, w), self.sum_gi_hi( tc, m, w)],
+                           [self.sum_hi( tc, m, w) , self.sum_fi_hi( tc, m, w) , self.sum_gi_hi ( tc, m, w) , self.sum_hi_square (tc, m, w)]
+                    ) )
+        return np.dot( a, b)
+
+    def sse(self, y, yest):
+        """
+        Both are array-like of the same shape (n,)
+        """
+        return  np.sum( np.power( y-yest, 2) )
+
+    def f(self, x):
+        t = self.data_series[0]
+        y = self.data_series[1]
+        yest = lpplc1(t, x)
+        return self.sse(y, yest)
+        
+    def f1(self, tc, m, w):
+        """
+        min of f. Searching over m and w
+        """
+        for (m,w) in [ (m,w) for m in search_ranges['m'] for w in search_ranges['w'] ]:
+            pass 
+    def f2(self):
+        pass 
+
+    def minimize( self, t_train, y_train, method = 'lm'):
+        limits = (  
+            #A , #B, Tc, m, c, omega, phi
+            [1, -100, self.d.data_size, 0.01, -1, 6, 0],
+            [1000, -0.1, 2*self.d.data_size, .999, 1, 13, 2 * np.pi]
+        )
+        x0 = np.array([1.0, -1, self.d.data_size, 0.5, .5, 6, 0])
+        res_lsq = least_squares(lppl_res, x0, f_scale=0.1, method= method, args=(t_train, y_train) ) if method=='lm'\
+        else least_squares(lppl_res, x0, f_scale=0.1, method= method, bounds= limits, args=(t_train, y_train) )
+        return res_lsq
+    
+
+    def plot_solution (self):
+        data_series = self.d.get_data_series( direction = 1)
+        plt.plot(self.d.data['LogClose'])
+        print("data size = %d" % self.d.data_size )
+        print("dataseries size = %d" % len(data_series[0]) )
+        solution = self.minimize ( data_series[0], data_series[1])
+        #A , #B, Tc, m, c, omega, phi
+        print( "solution: ", np.around(solution.x,3) )
+        model_data = lppl(data_series[0], solution.x )
+        plt.plot( data_series[0], model_data )
+
+        solution = self.minimize ( data_series[0], data_series[1], method = 'dogbox')
+        model_data = lppl(data_series[0], solution.x )
+        plt.plot( data_series[0], model_data )
+        print( "solution dogbox: ", np.around(solution.x,3) )
+
+        plt.xlabel("t")
+        plt.ylabel("Log P(t)")
+        plt.show()
+
+if __name__ == "__main__":
+
+    # plt.show(block=True)
+    random.seed()
+    #run()
+    l = Grid_Fit()
+    l.plot_solution()
+
+# Junk Code 
 def run1( search = True):
     # Get hourly data
     
@@ -325,12 +580,13 @@ def run1( search = True):
         print("Step: %d, dt: %d" % (step, dt))
         limits = (
             [1, 200],     # A :
-            [-100, -0.1],     # B :
-            [dt, 2*dt],     # Critical Time : between the end of the TS part and 1 length away 
+            [-1000, -0.1],     # B :
+            [dt, dt+50],     # Critical Time : between the end of the TS part and 1 length away 
+            #[dt, 2*dt],     # Critical Time : between the end of the TS part and 1 length away 
             #[350, 400],    # Critical Time :
             [0.01, .999],       # m :
             [-1, 1],        # c :
-            [4, 25],       # omega
+            [25, 50],       # omega
             #[12, 25],       # omega
             [0, 2 * np.pi]  # phi : up to 8.83
         )
@@ -378,67 +634,3 @@ def run1( search = True):
     plt.show(block=True)
     print( metrics.silhouette_score(points, labels) )
     print ( "Clusters: ", clusters )
-
-
-def cluster (points, n_clusters =2 ):
-    kmeans = KMeans(init='k-means++', n_clusters= n_clusters, n_init=10).fit(points)
-    return kmeans.cluster_centers_, kmeans.labels_
-
-class Lppl_Wrapper:
-
-    @property
-    def sse(self):
-        return self.__sse
-
-    @sse.setter
-    def sse(self, sse):
-        self.__sse = sse
-
-    @property
-    def model(self):
-        return self.__model
-
-    @model.setter
-    def model(self, model):
-        self.__model = model
-
-    def __init__ ( self, model, sse):
-        self.__model = model       
-        self.__sse = sse 
-        self.__tc = model[2]
-
-    @property
-    def tc(self):
-        return self.__tc
-
-    def generator (self, ts): #return fitting result using LPPL parameters
-        """
-        ts is a numpy array of time points starting from 0
-        """
-        #TODO check for errors. E.g. empty model
-        x = self.model
-
-        a = x[0]
-        b = x[1]
-        tc = x[2]
-        m = x[3]
-        c = x[4]
-        w = x[5]
-        phi = x[6]
-        try:
-            yield a + ( b*np.power( np.abs(tc-ts), m) ) *( 1 + ( c*np.cos((w*np.log( np.abs( tc-ts)))+ phi)))
-        except BaseException:
-            print( "(tc=%d,t=%d)"% (tc,ts) )
-
-    def plot(self, ts):
-        plt.plot(ts, list(self.generator(ts))[0]  )
-
-
-
-if __name__ == "__main__":
-
-    # plt.show(block=True)
-    random.seed()
-    run()
-
-
