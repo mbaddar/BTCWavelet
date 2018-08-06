@@ -13,6 +13,7 @@ from sklearn.cluster import KMeans
 
 from epsilon import Data_Wrapper, Epsilon_Drawdown
 from decomposition import Wavelet_Wrapper  
+import time
 
 
 
@@ -497,6 +498,9 @@ class Grid_Fit:
         return self.sse(y, yest)
 
     def solve (self, con = True):
+        """
+        Set con = True. to search with the below constraints
+        """
         a = (-np.inf, np.inf)
         b = (-np.inf, -0.001)
         tc = (self.d.data_size, 2*self.d.data_size)
@@ -511,6 +515,8 @@ class Grid_Fit:
             conB = { 'type': 'eq', 'fun': self.conB }
             conC1 = { 'type': 'eq', 'fun': self.conC1 }
             conC2 = { 'type': 'eq', 'fun': self.conC2 }
+            print("Minimizing...")
+            then = time.time()
             solution = minimize( self.f ,x0,method='SLSQP',bounds=limits,\
                                 constraints=[conA, conB, conC1, conC2],\
                                 options={ 'maxiter': 150000} )
@@ -518,7 +524,8 @@ class Grid_Fit:
             solution = minimize( self.f ,x0,method='SLSQP',bounds=limits,\
                                 options={ 'maxiter': 150000} )
             
-        print( solution )
+        print( "Minimization completed in %4f seconds" % (time.time()-then) )
+        print( "Crash in %3f days" % (solution.x[2]- self.d.data_size)/24. )
         return solution 
 
     def plot_solution (self, con = True):
@@ -535,7 +542,7 @@ class Grid_Fit:
         plt.ylabel("Log P(t)")
 
 def run( Test = False, date1 = "2017-11-1 00:00:00", date2= "2017-12-16 00:00:00" ):
-    l = Grid_Fit("2017-11-1 00:00:00", "2017-12-16 00:00:00" )
+    l = Grid_Fit("1999-11-1 00:00:00", "2017-12-16 00:00:00" )
     #l.plot_solution( con = True)
     d = Data_Wrapper( hourly = True)
     d.filter_by_date( date1, date2 )
@@ -588,13 +595,11 @@ if __name__ == "__main__":
 
     # plt.show(block=True)
     random.seed()
-    l = Grid_Fit("2017-11-1 00:00:00", "2017-12-16 00:00:00" )
+    l = Grid_Fit("2016-01-15 00:00:00", "2017-12-10 00:00:00" )
     l.plot_solution( con = True)
-    pl = Pipeline( l.d )
-    lpplfit = pl.model_lppl( l.data_series ) # returns 3 fits
-    print( "fits: "+ str(len(lpplfit) ))
-    for i in range(3):
-        lpplfit[i].plot( l.data_series[0], offset = 0 )
+    l.plot_solution( con = False)
+    #pl = Pipeline( l.d )
+    #lpplfit = pl.model_lppl( l.data_series ) # returns 3 fits
     plt.show()
 
 # Junk Code 
