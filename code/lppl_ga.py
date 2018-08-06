@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import fmin_tnc, least_squares
+from scipy.optimize import fmin_tnc, least_squares, minimize
 import random
 import pandas as pd
 from pandas_datareader import data as pdr
@@ -260,54 +260,6 @@ class Pipeline:
         return wrappers #The first fit model
         #return wrappers[0] #The first fit model
 
-def run( Test = False ):
-    d = Data_Wrapper( hourly = True)
-    d.filter_by_date( "2017-12-1 00:00:00", "2018-1-10 00:00:00")
-    pl = Pipeline( d )
-
-    #TODO Get bubble points. Uncomment
-    # data, bubble_points = pl.do_pass (level = 0) 
-    # #Add reconstructed data
-    # d.data = data
-    # print( bubble_points )
-    plt.plot( d.data['LogClose'])
-    # plt.scatter( *zip(*bubble_points) )
-    # print("Bubble points size: ", len(bubble_points) )
-
-    #for i in range( 1, len(bubble_points ) ):
-    for i in range( 1, 2 ):
-        _to = 200
-        _from = 1
-        # _to = bubble_points[i][0]
-        # _from = bubble_points[i-1][0]
-        print("Fitting data from peak point %d to point %d " % (_from, _to) )
-        data_size = _to - _from + 1
-        points = []
-        # for step in range(0, data_size-240,12 ): #skip 12 time points and recalculate
-        #TODO test range. Use the above 
-        if data_size > 48:
-            print("Data size:", data_size )
-            #for step in range( 0, data_size - 24, 12 ): #skip 12 time points and recalculate
-            for step in [0]: 
-            #for step in range(0, data_size - 240, 12 ): #skip 12 time points and recalculate
-                # respective minimum and maximum values ​​of the seven parameters fitting process
-                data_series = d.get_data_series( index = _from+ step, to=_to,  direction = 1) 
-                dt = data_series[0].size
-                lppl = pl.model_lppl( data_series ) # returns 3 fits
-                print("Step: %d, dt: %d" % (step, dt))
-                #x = lppl.Population(limits, 20, 0.3, 1.5, .05, 4)
-                points.append( (lppl[0].tc-dt, dt ) )
-                for i in range(3):
-                    lppl[i].plot( data_series[0], offset = step + _from )
-    plt.show(block=True)
-        # plt.scatter( *zip( *points) )
-        # plt.gca().set_xlabel('tc-t2')
-        # plt.gca().set_ylabel('dt = t2-t1')
-        # clusters, labels = cluster(points, 4)
-        # plt.scatter( *zip( *clusters) )
-        # plt.show(block=True)
-        # print( metrics.silhouette_score(points, labels) )
-        # print ( "Clusters: ", clusters )
 
 
 def cluster (points, n_clusters =2 ):
@@ -384,7 +336,7 @@ def lppl (t,x): #return fitting result using LPPL parameters
         # return a + ( b*np.power( np.abs(tc-t), m) ) *(1 + ( c*np.cos((w*np.log( np.abs( tc-t ) ))+phi)))
         return a + ( np.power( tc-t, m)) *\
                ( b + ( c * np.cos((w*np.log(  tc-t  ))-phi)) )
-    except BaseException:
+    except (BaseException, RuntimeWarning) :
         print( "(tc=%d,t=%d)"% (tc,t) )
 
 def lpplc1 (t,x): #return fitting result using LPPL parameters
@@ -432,11 +384,11 @@ class Grid_Fit:
     def data_series(self, data_series):
         self.__data_series = data_series
     
-    def __init__(self):
+    def __init__(self, date1 = "2017-12-1 00:00:00", date2= "2017-12-5 00:00:00"):
         d = Data_Wrapper( hourly = True)
-        d.filter_by_date( "2017-11-01 00:00:00", "2017-12-17 00:00:00")
+        d.filter_by_date( date1, date2)
         self.d = d
-        self.data_series = d.get_data_series()
+        self.data_series = d.get_data_series( direction = 1)
 
 
     def fi(self, tc, t, m):
@@ -452,7 +404,7 @@ class Grid_Fit:
         return np.sum( np.multiply( np.power( tc-t, m), np.cos( ( w*np.log( tc-t ))) ) )
     def sum_hi( self, tc, m, w ):
         t = self.data_series[0]
-        return np.sum( np.multiply( np.power( tc-t, m) , np.cos( ( w*np.log( tc-t ))) ) )
+        return np.sum( np.multiply( np.power( tc-t, m) , np.sin( ( w*np.log( tc-t ))) ) )
 
     def sum_fi_square(self, tc, m):
         t = self.data_series[0]
@@ -462,50 +414,79 @@ class Grid_Fit:
         return np.sum( np.power( np.multiply( np.power( tc-t, m), np.cos( ( w*np.log( tc-t ))) ), 2 ) )
     def sum_hi_square ( self, tc, m, w ):
         t = self.data_series[0]
-        return np.sum( np.power( np.multiply( np.power( tc-t, m) , np.cos( ( w*np.log( tc-t ))) ),2 ) )
+        return np.sum( np.power( np.multiply( np.power( tc-t, m) , np.sin( ( w*np.log( tc-t ))) ),2 ) )
 
     def sum_yi(self):
         t = self.data_series[0]
         return np.sum( self.data_series[1] )
     def sum_yi_fi(self, tc, m):
         t = self.data_series[0]
-        return np.sum( np.multiply( self.data_series[1], np.power( tc-self.data_series[0], m) ) )  
+        return np.sum( np.multiply( self.data_series[1], np.power( tc-t, m) ) )  
     def sum_yi_gi(self, tc, m, w):
         t = self.data_series[0]
         return np.sum( np.multiply( self.data_series[1], np.multiply( np.power( tc-t, m), np.cos( ( w*np.log( tc-t ))) ) ) )  
     def sum_yi_hi(self, tc, m, w):
         t = self.data_series[0]
-        return np.sum( np.multiply( self.data_series[1], np.multiply( np.power( tc-t, m) , np.cos( ( w*np.log( tc-t ))) ) ) )  
+        return np.sum( np.multiply( self.data_series[1], np.multiply( np.power( tc-t, m) , np.sin( ( w*np.log( tc-t ))) ) ) )  
 
     def sum_fi_gi(self, tc, m, w):
         t = self.data_series[0]
-        return np.sum( np.multiply( np.power( tc-self.data_series[0], m), np.multiply( np.power( tc-t, m), np.cos( ( w*np.log( tc-t ))) ) ) )  
+        return np.sum( np.multiply( np.power( tc-self.data_series[0], 2*m),  np.cos( ( w*np.log( tc-t ))) ) ) 
     def sum_gi_hi (self, tc, m, w ):
         t = self.data_series[0]
-        return np.sum( np.multiply( np.multiply( np.power( tc-t, m), np.cos( ( w*np.log( tc-t ))) ) ), np.multiply( np.power( tc-t, m) , np.cos( ( w*np.log( tc-t ))) ) )
+        return np.sum( np.multiply( np.multiply( np.power( tc-t, 2*m), np.cos( ( w*np.log( tc-t ))) ) ,np.sin( ( w*np.log( tc-t ))) ) ) 
     def sum_fi_hi( self, tc, m, w ):
         t = self.data_series[0]
-        return np.sum( np.multiply ( np.power( tc-self.data_series[0], 2*m), np.multiply( np.power( tc-t, m) , np.cos( ( w*np.log( tc-t ))) ) ) )
+        return np.sum( np.multiply ( np.power( tc-self.data_series[0], 2*m) , np.sin( ( w*np.log( tc-t )) ) ) ) 
     
 
-    def fit_linear_params (self, tc, m, w):
+    def linear_constraint (self, x):
         """
         Fits A, B, C1, C2 according to an analytic solution given tc, m, w
         Returns a vector of A, B, C1, C2
         """
+        tc = x[2]
+        m = x[3]
+        w = x[5]
         from numpy.linalg import inv
         b = np.array( [self.sum_yi(), self.sum_yi_fi(tc, m), self.sum_yi_gi (tc, m, w), self.sum_yi_gi (tc, m, w) ] ).T
         # Summetric 
-        a = inv( np.array( [ self.d.data_size, self.sum_fi(tc, m), self.sum_gi( tc, m, w), self.sum_hi( tc, m, w)],
+        a = inv( np.array( [[ self.d.data_size, self.sum_fi(tc, m), self.sum_gi( tc, m, w), self.sum_hi( tc, m, w)],
                            [self.sum_fi( tc, m), self.sum_fi_square(tc, m), self.sum_fi_gi(tc, m, w), self.sum_fi_hi(tc, m, w)],
                            [self.sum_gi(tc, m, w), self.sum_fi_gi(tc, m, w), self.sum_gi_square( tc, m, w), self.sum_gi_hi( tc, m, w)],
-                           [self.sum_hi( tc, m, w) , self.sum_fi_hi( tc, m, w) , self.sum_gi_hi ( tc, m, w) , self.sum_hi_square (tc, m, w)]
+                           [self.sum_hi( tc, m, w) , self.sum_fi_hi( tc, m, w) , self.sum_gi_hi ( tc, m, w) , self.sum_hi_square (tc, m, w)] ]
                     ) )
-        return np.dot( a, b)
+        sol = np.dot( a, b) # A, B, C1, C2
+        return sol
+
+    def conA (self, x):
+        sol = self.linear_constraint(x)
+        #limits = ( a, b, tc, m, c1, w, c2)
+        obj = sol[0]-x[0] #for the minimize function to work. Objective must be 0. Or so I understand!
+        return obj
+    def conB (self, x):
+        sol = self.linear_constraint(x)
+        #limits = ( a, b, tc, m, c1, w, c2)
+        obj = sol[1]-x[1] #for the minimize function to work. Objective must be 0. Or so I understand!
+        return obj
+    def conC1 (self, x):
+        sol = self.linear_constraint(x)
+        #limits = ( a, b, tc, m, c1, w, c2)
+        obj = sol[2]-x[4] #for the minimize function to work. Objective must be 0. Or so I understand!
+        return obj
+    def conC2 (self, x):
+        sol = self.linear_constraint(x)
+        #limits = ( a, b, tc, m, c1, w, c2)
+        obj = sol[3]-x[6] #for the minimize function to work. Objective must be 0. Or so I understand!
+        return obj
+
+
+
 
     def sse(self, y, yest):
         """
         Both are array-like of the same shape (n,)
+        Returns: Sum-squared error 
         """
         return  np.sum( np.power( y-yest, 2) )
 
@@ -514,55 +495,107 @@ class Grid_Fit:
         y = self.data_series[1]
         yest = lpplc1(t, x)
         return self.sse(y, yest)
-        
-    def f1(self, tc, m, w):
-        """
-        min of f. Searching over m and w
-        """
-        for (m,w) in [ (m,w) for m in search_ranges['m'] for w in search_ranges['w'] ]:
-            pass 
-    def f2(self):
-        pass 
 
-    def minimize( self, t_train, y_train, method = 'lm'):
-        limits = (  
-            #A , #B, Tc, m, c, omega, phi
-            [1, -100, self.d.data_size, 0.01, -1, 6, 0],
-            [1000, -0.1, 2*self.d.data_size, .999, 1, 13, 2 * np.pi]
-        )
-        x0 = np.array([1.0, -1, self.d.data_size, 0.5, .5, 6, 0])
-        res_lsq = least_squares(lppl_res, x0, f_scale=0.1, method= method, args=(t_train, y_train) ) if method=='lm'\
-        else least_squares(lppl_res, x0, f_scale=0.1, method= method, bounds= limits, args=(t_train, y_train) )
-        return res_lsq
-    
+    def solve (self, con = True):
+        a = (-np.inf, np.inf)
+        b = (-np.inf, -0.001)
+        tc = (self.d.data_size, 2*self.d.data_size)
+        m = (0.1, 0.9)
+        c1 = (-1, 1)
+        w = (4,25)
+        c2 = (-1, 1)
+        limits = ( a, b, tc, m, c1, w, c2)
+        x0 = np.array( [0, -1, self.d.data_size, 0.2, -.5, 13, .5])
+        if con:
+            conA = { 'type': 'eq', 'fun': self.conA }
+            conB = { 'type': 'eq', 'fun': self.conB }
+            conC1 = { 'type': 'eq', 'fun': self.conC1 }
+            conC2 = { 'type': 'eq', 'fun': self.conC2 }
+            solution = minimize( self.f ,x0,method='SLSQP',bounds=limits,\
+                                constraints=[conA, conB, conC1, conC2],\
+                                options={ 'maxiter': 150000} )
+        else:
+            solution = minimize( self.f ,x0,method='SLSQP',bounds=limits,\
+                                options={ 'maxiter': 150000} )
+            
+        print( solution )
+        return solution 
 
-    def plot_solution (self):
+    def plot_solution (self, con = True):
         data_series = self.d.get_data_series( direction = 1)
         plt.plot(self.d.data['LogClose'])
-        print("data size = %d" % self.d.data_size )
-        print("dataseries size = %d" % len(data_series[0]) )
-        solution = self.minimize ( data_series[0], data_series[1])
+        # solution = self.minimize ( data_series[0], data_series[1])
+        solution = self.solve ( con )
         #A , #B, Tc, m, c, omega, phi
-        print( "solution: ", np.around(solution.x,3) )
-        model_data = lppl(data_series[0], solution.x )
+        print( "solution: ", solution.x )
+        model_data = lpplc1(data_series[0], solution.x )
         plt.plot( data_series[0], model_data )
-
-        solution = self.minimize ( data_series[0], data_series[1], method = 'dogbox')
-        model_data = lppl(data_series[0], solution.x )
-        plt.plot( data_series[0], model_data )
-        print( "solution dogbox: ", np.around(solution.x,3) )
 
         plt.xlabel("t")
         plt.ylabel("Log P(t)")
-        plt.show()
+
+def run( Test = False, date1 = "2017-11-1 00:00:00", date2= "2017-12-16 00:00:00" ):
+    l = Grid_Fit("2017-11-1 00:00:00", "2017-12-16 00:00:00" )
+    #l.plot_solution( con = True)
+    d = Data_Wrapper( hourly = True)
+    d.filter_by_date( date1, date2 )
+    pl = Pipeline( d )
+
+    #TODO Get bubble points. Uncomment
+    # data, bubble_points = pl.do_pass (level = 0) 
+    # #Add reconstructed data
+    # d.data = data
+    # print( bubble_points )
+    plt.plot( d.data['LogClose'])
+    # plt.scatter( *zip(*bubble_points) )
+    # print("Bubble points size: ", len(bubble_points) )
+
+    #for i in range( 1, len(bubble_points ) ):
+    for i in range( 1, 2 ):
+        _to = 200
+        _from = 1
+        # _to = bubble_points[i][0]
+        # _from = bubble_points[i-1][0]
+        print("Fitting data from peak point %d to point %d " % (_from, _to) )
+        data_size = _to - _from + 1
+        points = []
+        # for step in range(0, data_size-240,12 ): #skip 12 time points and recalculate
+        #TODO test range. Use the above 
+        if data_size > 48:
+            print("Data size:", data_size )
+            #for step in range( 0, data_size - 24, 12 ): #skip 12 time points and recalculate
+            for step in [0]: 
+            #for step in range(0, data_size - 240, 12 ): #skip 12 time points and recalculate
+                # respective minimum and maximum values ​​of the seven parameters fitting process
+                data_series = d.get_data_series( index = _from+ step, to=_to,  direction = 1) 
+                dt = data_series[0].size
+                lppl = pl.model_lppl( data_series ) # returns 3 fits
+                print("Step: %d, dt: %d" % (step, dt))
+                #x = lppl.Population(limits, 20, 0.3, 1.5, .05, 4)
+                points.append( (lppl[0].tc-dt, dt ) )
+                for i in range(3):
+                    lppl[i].plot( data_series[0], offset = step + _from )
+        # plt.scatter( *zip( *points) )
+        # plt.gca().set_xlabel('tc-t2')
+        # plt.gca().set_ylabel('dt = t2-t1')
+        # clusters, labels = cluster(points, 4)
+        # plt.scatter( *zip( *clusters) )
+        # plt.show(block=True)
+        # print( metrics.silhouette_score(points, labels) )
+        # print ( "Clusters: ", clusters )
 
 if __name__ == "__main__":
 
     # plt.show(block=True)
     random.seed()
-    #run()
-    l = Grid_Fit()
-    l.plot_solution()
+    l = Grid_Fit("2017-11-1 00:00:00", "2017-12-16 00:00:00" )
+    l.plot_solution( con = True)
+    pl = Pipeline( l.d )
+    lpplfit = pl.model_lppl( l.data_series ) # returns 3 fits
+    print( "fits: "+ str(len(lpplfit) ))
+    for i in range(3):
+        lpplfit[i].plot( l.data_series[0], offset = 0 )
+    plt.show()
 
 # Junk Code 
 def run1( search = True):
