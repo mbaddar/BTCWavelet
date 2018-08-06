@@ -106,13 +106,15 @@ class Data_Wrapper:
         self.data_size = dataSeries[0].size
         return dataSeries
     
-    def get_data_series( self, index =0, to = -1, direction = -1):
+    def get_data_series( self, index =0, to = -1, direction = 1, col = 'LogClose'):
         """
         Direction: +/- 1
         """
         if direction not in [-1,1]:
             direction = 1 #Should raise some error 
-        data = np.array( self.data['LogClose'][index: to] if to>-1 else self.data['LogClose'][index:] ) 
+        # Remove na first 
+        data = self.data[ col ][self.data[ col ].notna()]
+        data = np.array( data[index: to] if to>-1 else data[index:] ) 
         data_size = data.size 
         #time = np.linspace( 0, data_size-1, data_size) #just a sequence 
         time = np.arange( data_size )
@@ -121,8 +123,10 @@ class Data_Wrapper:
         #     close = [ data[ i] for i in range( 0 , data_size ) ]
         # else:
         #     close = [ data[ -i] for i in range( 1 , data_size + 1 )]
-        close = (data if direction==1 else np.flip(data, axis=0) )
-        dataSeries = [time, close]
+        values = (data if direction==1 else np.flip(data, axis=0) )
+        dataSeries = [time, values]
+        # Reset data size
+        self.data_size = data_size        
         return dataSeries
 
     def get_hourly_data( self, path = "2018"):

@@ -418,7 +418,6 @@ class Grid_Fit:
         return np.sum( np.power( np.multiply( np.power( tc-t, m) , np.sin( ( w*np.log( tc-t ))) ),2 ) )
 
     def sum_yi(self):
-        t = self.data_series[0]
         return np.sum( self.data_series[1] )
     def sum_yi_fi(self, tc, m):
         t = self.data_series[0]
@@ -451,7 +450,7 @@ class Grid_Fit:
         w = x[5]
         from numpy.linalg import inv
         b = np.array( [self.sum_yi(), self.sum_yi_fi(tc, m), self.sum_yi_gi (tc, m, w), self.sum_yi_gi (tc, m, w) ] ).T
-        # Summetric 
+        # Symmetric 
         a = inv( np.array( [[ self.d.data_size, self.sum_fi(tc, m), self.sum_gi( tc, m, w), self.sum_hi( tc, m, w)],
                            [self.sum_fi( tc, m), self.sum_fi_square(tc, m), self.sum_fi_gi(tc, m, w), self.sum_fi_hi(tc, m, w)],
                            [self.sum_gi(tc, m, w), self.sum_fi_gi(tc, m, w), self.sum_gi_square( tc, m, w), self.sum_gi_hi( tc, m, w)],
@@ -481,9 +480,6 @@ class Grid_Fit:
         obj = sol[3]-x[6] #for the minimize function to work. Objective must be 0. Or so I understand!
         return obj
 
-
-
-
     def sse(self, y, yest):
         """
         Both are array-like of the same shape (n,)
@@ -491,11 +487,14 @@ class Grid_Fit:
         """
         return  np.sum( np.power( y-yest, 2) )
 
-    def f(self, x):
+    def objective(self, x):
         t = self.data_series[0]
         y = self.data_series[1]
         yest = lpplc1(t, x)
-        return self.sse(y, yest)
+        # Reduce the SSE to help the minimization algorithm reach a local minma.
+        # Still unsure about the global minima 
+        obj = self.sse(y, yest)
+        return obj
 
     def solve (self, con = True):
         """
@@ -510,36 +509,40 @@ class Grid_Fit:
         c2 = (-1, 1)
         limits = ( a, b, tc, m, c1, w, c2)
         x0 = np.array( [0, -1, self.d.data_size, 0.2, -.5, 13, .5])
+        then = time.time()
         if con:
             conA = { 'type': 'eq', 'fun': self.conA }
             conB = { 'type': 'eq', 'fun': self.conB }
             conC1 = { 'type': 'eq', 'fun': self.conC1 }
             conC2 = { 'type': 'eq', 'fun': self.conC2 }
+            options = { 'maxiter': 150000 ,'ftol': 1e-2}
             print("Minimizing...")
-            then = time.time()
-            solution = minimize( self.f ,x0,method='SLSQP',bounds=limits,\
+            # methods: SLSQP, 
+            # Nelder-Mead: Simplex does not work in the below form
+            # Bounded: L-BFGS-B, TNC, SLSQP
+            solution = minimize( self.objective ,x0 ,method='SLSQP',bounds=limits,\
                                 constraints=[conA, conB, conC1, conC2],\
-                                options={ 'maxiter': 150000} )
+                                options= options )
         else:
-            solution = minimize( self.f ,x0,method='SLSQP',bounds=limits,\
-                                options={ 'maxiter': 150000} )
+            solution = minimize( self.objective ,x0 ,method='SLSQP',bounds=limits,\
+                                options= options )
             
-        print( "Minimization completed in %4f seconds" % (time.time()-then) )
-        print( "Crash in %3f days" % (solution.x[2]- self.d.data_size)/24. )
-        return solution 
+        print( "Minimization completed in %.2f seconds" % (time.time()-then) )
+        crash = (solution.x[2]- self.d.data_size)/24. 
+        print( solution)
+        return solution, crash 
 
-    def plot_solution (self, con = True):
-        data_series = self.d.get_data_series( direction = 1)
-        plt.plot(self.d.data['LogClose'])
-        # solution = self.minimize ( data_series[0], data_series[1])
-        solution = self.solve ( con )
-        #A , #B, Tc, m, c, omega, phi
-        print( "solution: ", solution.x )
-        model_data = lpplc1(data_series[0], solution.x )
-        plt.plot( data_series[0], model_data )
-
-        plt.xlabel("t")
+    def plot_solution (self, con = True, col = 'LogClose'):
+        plt.plot(self.d.data[ col ])
+        self.data_series = self.d.get_data_series( direction = 1, col = col)
+        print("New data size =", self.d.data_size )  
+        solution, crash = self.solve ( con )
+        model_data = lpplc1( self.data_series[0], solution.x )
+        plt.plot( self.data_series[0], model_data )
+        plt.xlabel("t - crash in %.2f days" % crash)
         plt.ylabel("Log P(t)")
+        # solution = self.minimize ( data_series[0], data_series[1])
+        #A , #B, Tc, m, c, omega, phi
 
 def run( Test = False, date1 = "2017-11-1 00:00:00", date2= "2017-12-16 00:00:00" ):
     l = Grid_Fit("1999-11-1 00:00:00", "2017-12-16 00:00:00" )
@@ -592,12 +595,18 @@ def run( Test = False, date1 = "2017-11-1 00:00:00", date2= "2017-12-16 00:00:00
         # print ( "Clusters: ", clusters )
 
 if __name__ == "__main__":
-
+    # start date 17/9/2013
     # plt.show(block=True)
     random.seed()
-    l = Grid_Fit("2016-01-15 00:00:00", "2017-12-10 00:00:00" )
-    l.plot_solution( con = True)
-    l.plot_solution( con = False)
+    #l = Grid_Fit("2017-11-15 00:00:00", "2017-12-10 00:00:00" )
+    #l = Grid_Fit("2017-06-15 00:00:00", "2017-12-10 00:00:00" )
+    l = Grid_Fit("2013-11-10 00:00:00", "2013-11-18 00:00:00" )
+    wavelet = Wavelet_Wrapper( l.d.data['LogClose'].tolist() , padding = False)
+    recon = pd.DataFrame( wavelet.reconstruct( level = 1 ) , columns = ['Recon'] )
+    l.d.data['Recon'] = recon['Recon']
+    # l.data_series = l.d.get_data_series( direction = 1)
+    # print(" Dataseries shape =", l.data_series[0].shape) 
+    l.plot_solution( con = True, col = 'Recon')
     #pl = Pipeline( l.d )
     #lpplfit = pl.model_lppl( l.data_series ) # returns 3 fits
     plt.show()
