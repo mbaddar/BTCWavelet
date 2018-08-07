@@ -33,8 +33,8 @@ def get_date_from_epoch( epoch):
     str_time = t.strftime( date_format )
     return str_time
 
-def get_epoch( date):
-    utc_time = datetime.strptime( date, date_format)
+def get_epoch( date_str):
+    utc_time = datetime.strptime( date_str, date_format)
     epoch_time = (utc_time - datetime(1970, 1, 1)).total_seconds()
     return int( np.round( epoch_time))
 
@@ -61,16 +61,39 @@ class Data_Wrapper:
     @data_size.setter
     def data_size(self, data_size):
         self.__data_size = data_size
-    
 
-    def __init__ (self, hourly = True):
-        
+    def __init__ (self, hourly = True, data_source = 'BTC'):
+        """
+        Support multiple data sources
+        data_source: one of: 'BTC', 'SP500'
+        """
         self.lppl_data = None 
         self.data = None
-        if hourly:
-            self.get_hourly_data()
+        if data_source == 'BTC':
+            if hourly:
+                self.get_hourly_data()
+            else:
+                self.get_lppl_data()
+        elif data_source == 'SP500':
+            self.get_SP500_data()
         else:
-            self.get_lppl_data()
+            print("Invalid data source") #TODO raise error 
+
+    def get_SP500_data(self, path = 'Data\\EWS-QR-LPPL-data-master\\sp5001987.csv'):
+        df = None
+        try:
+            df = DataFrame.from_csv( path)
+            df = DataFrame.from_csv( path).reset_index()
+            df.columns = ['Date', 'Price']
+            df['LogPrice'] = df['Price'].apply( lambda x: np.log(x))
+            df['StrDate'] = df['Date']
+            df['Date'] = df['Date'].apply( lambda date: int(np.round((date - datetime(1970, 1, 1)).total_seconds()) ))
+            #df['Date'] = df['Date'].apply( lambda x: )
+        except BaseException as e:
+            print( e )
+        self.data = df
+        self.data_size = df['LogPrice'].size
+        return df 
 
     def get_lppl_data(self, date_from = '2015-09-01 00:00:00', date_to = '2015-10-24 00:00:00', force_read = False ):
         # BTC
@@ -136,8 +159,8 @@ class Data_Wrapper:
         # reset index pushes the date index into a column
         hourly_data = c.get_complete_df ( path, ['close'] ).reset_index()
         hourly_data['LogClose'] = hourly_data['close'].apply( lambda x: np.log(x) )
-        hourly_data.columns = ['date', 'close', 'LogClose']
-        hourly_data['StrDate'] = hourly_data['date'].apply( lambda epoch: get_date_from_epoch( epoch) )
+        hourly_data.columns = ['Date', 'Close', 'LogClose']
+        hourly_data['StrDate'] = hourly_data['Date'].apply( lambda epoch: get_date_from_epoch( epoch) )
         self.data = hourly_data
         self.__data_size = hourly_data.LogClose.size 
         return hourly_data
@@ -147,13 +170,13 @@ class Data_Wrapper:
         Example date: 2017-09-17 11:00:00
         """
         df = self.data
-        print(df['date'].size)        
-        df = df.loc[ df['date'] >= get_epoch( date_from) ]
-        df = df.loc[ df['date'] <= get_epoch( date_to) ]
+        print(df['Date'].size)        
+        df = df.loc[ df['Date'] >= get_epoch( date_from) ]
+        df = df.loc[ df['Date'] <= get_epoch( date_to) ]
         df = df.reset_index()
         df = df.drop(['index'], axis=1)
         self.data = df
-        self.data_size = df['date'].size
+        self.data_size = df['Date'].size
 
     def get_test_data(self):
         #Test data
@@ -205,8 +228,8 @@ class Data_Wrapper:
             print( e )
 
 if __name__ == "__main__":
-    d = Data_Wrapper()
-    d.filter_by_date( "2017-12-1 00:00:00", "2018-1-10 00:00:00")
+    d = Data_Wrapper( data_source= 'SP500')
+    d.filter_by_date( "1984-1-3 00:00:00", "1984-1-10 00:00:00")
     print(d.data.head())
 
 
@@ -672,22 +695,3 @@ class Lagrange_regularizer:
     # plt.plot(x, SSEL)
     # plt.show()
 
-
-################# Junk Code ############################
-    #Optimize the return p_list starting from every item on the TS
-    #self.__p_list = [self.__p(0,k) for k in range( 0, self.__data_size )]
-    #retiring __2dplist
-    # __2dplist = []
-    # if p_list: 
-    #     for i in range(0, self.__data_size):
-    #         #p = [self.__p(i,k) for k in range( i, self.__data_size )]
-    #         # p = [ self.data.LogClose[k]-self.data.LogClose[i] \
-    #         #     for k in range( i, self.__data_size )]
-    #         p = np.subtract( np.array( self.data.LogClose[i:self.__data_size]), \
-    #         self.data.LogClose[i]).tolist()
-    #         print( "Plist:%d of %d"% (i, self.__data_size) )
-    #         __2dplist.append(p)
-    #     self.__p_list = __2dplist
-        # for l in __2dplist:
-        #     print(len(l), " elements: [" , ",".join( [str("{0:.2f}".format(i)) for i in l ]), "]"  )
-        #print("Done plist")
