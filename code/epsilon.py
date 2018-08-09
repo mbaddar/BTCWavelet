@@ -197,7 +197,7 @@ class Data_Wrapper:
         #time = np.linspace( 0, data_size-1, data_size) #just a sequence 
         time = None
         if fraction: #apply a filter then convert to numpy array
-            time = self.data['Date'].apply( lambda epoch: toYearFraction( epoch) ).values
+            time = self.data['Date'].apply( lambda epoch: toYearFraction( epoch) ).values[:data_size]
         else:
             time = np.arange( data_size )
         values = (data if direction==1 else np.flip(data, axis=0) )

@@ -246,25 +246,26 @@ class Nonlinear_Fit:
                 return x    
 
            
-        a = (.5, np.inf)
-        b = (-np.inf, -0.001)
+        a = (.5, 1000)
+        b = (-1000, -0.001)
         # Now tc represet a fractional year instead of a time index
         time_head = self.data_series[0][self.d.data_size-1]+0.01
         tc = (time_head, time_head+0.4 ) #look 3 months in advance (.25)
         # old time index limits
         #tc = (self.d.data_size, 1.4*self.d.data_size )
         m = (0.1, 0.9)
-        c1 = c2 =  (-1, 1)
+        c1 = c2 =  (-10, 10)
         w = (3,25)
 
         limits = (a, b, tc, m, c1, w, c2)
-        bounds = [(.5, 10000), (-10000, -0.001), (time_head, time_head +.4 )
-        , (0.1, 0.9), (-100, 100), (3,25), (-100, 100) ]
+        bounds = list(limits) 
+        # bounds = [(.5, 10000), (-10000, -0.001), (time_head, time_head +.4 )
+        # , (0.1, 0.9), (-100, 100), (3,25), (-100, 100) ]
         #initial guess inline with what parameters represent
         x0 = np.array( 
             [ np.average(self.data_series[1]) , 
              - (np.amax(self.data_series[1])-np.amin(self.data_series[1]) ),
-             time_head, 0.5, 1, 7, -1])
+             time_head, 0.5, 1, 3, -1])
         print("Initial guess: ", x0)
         xmin = [a[0], b[0], tc[0], m[0], c1[0], w[0], c2[0]]
         xmax = [a[1], b[1], tc[1], m[1], c1[1], w[1], c2[1]]
@@ -300,10 +301,10 @@ class Nonlinear_Fit:
         # mybounds = MyBounds( xmin, xmax )
         if method == 'basinhopping':
             solution = basinhopping( self.objective, x0, minimizer_kwargs=minimizer_kwargs,
-                        T= 2 ,niter=30, take_step = mytakestep, callback= print_fun )        
+                        T= 1 ,niter=40, take_step = mytakestep, callback= print_fun )        
         else: # Either basinhopping or differential evolution 
             solution = differential_evolution( self.objective, bounds= bounds, 
-                        tol=1e-4, maxiter=10000)        
+                        tol=1e-6, maxiter=100000)        
 
         #print( "Minimization completed in %.2f seconds" % (time.time()-then) )
         # Now crash is a real point in time
@@ -385,7 +386,7 @@ class Nonlinear_Fit:
         # plt.plot(tc_range, obj)
 
 def run( Test = False, date1 = "2017-11-1 00:00:00", date2= "2017-12-16 00:00:00" ):
-    l = Nonlinear_Fit("1999-11-1 00:00:00", "2017-12-16 00:00:00" )
+    l = Nonlinear_Fit("1999-11-1 00:00:00", "2017-12-16 00:0f0:00" )
     #l.plot_solution( con = True)
     d = Data_Wrapper( hourly = True)
     d.filter_by_date( date1, date2 )
@@ -437,38 +438,26 @@ def run( Test = False, date1 = "2017-11-1 00:00:00", date2= "2017-12-16 00:00:00
 if __name__ == "__main__":
     # start date 17/9/2013
     # plt.show(block=True)
-    random.seed(1)
+    random.seed()
     # l = Grid_Fit("2017-1-1 00:00:00", "2017-12-10 00:00:00" )
     # plt.plot(l.data_series[0], l.data_series[1])
     #l = Nonlinear_Fit("2017-10-1 00:00:00", "2017-12-10 00:00:00" )
     #l = Nonlinear_Fit("1984-07-30 00:00:00", "1987-06-12 00:00:00" , data_source= 'SP500')
-    l = Nonlinear_Fit("1984-09-30 00:00:00", "1987-06-12 00:00:00" , data_source= 'SP500')
+    l = Nonlinear_Fit("1984-09-21 00:00:00", "1987-08-06 00:00:00" , data_source= 'SP500')
+    wavelet = Wavelet_Wrapper( l.d.data['LogClose'].tolist() , padding = False)
+    recon = pd.DataFrame( wavelet.reconstruct( level = 1 ) , columns = ['Recon'] )
+    l.d.data['Recon'] = recon['Recon']
+    l.data_series = l.d.get_data_series( direction = 1, col='Recon', fraction =1)
+    l.plot_solution(col = 'Recon', method= 'basinhopping' )
+
      # Parameters 
-    # c1 = c *cos(phi), c2 = c * sin (phi)
-    # 
-    # a, b, tc, m, c, w, phi
-    #x = [36960, -35902, 91.81, 0.16, -18839, 4.8, -.3]
-    #l.plot_solution( con = True, col = 'LogClose',scale = 1) #Recon data size issue
     #l.plot_solution(  col = 'LogClose',scale = 1) #Recon data size issue
-    l.plot_solution(col = 'LogClose', method= 'basinhopping' )
+    # l.plot_solution(col = 'LogClose', method= 'basinhopping' )
     # plt.close('all')
     # l = Grid_Fit("2017-10-15 00:00:00", "2017-12-10 00:00:00" )
     # l.plot_solution( con = True, col = 'LogClose',scale = 1) #Recon data size issue
     # plt.show()
 
-    #l = Grid_Fit("2017-1-15 00:00:00", "2017-12-10 00:00:00" )
-    #l = Grid_Fit("2017-06-15 00:00:00", "2017-12-10 00:00:00" )
-    #l = Grid_Fit("2013-11-10 00:00:00", "2013-11-18 00:00:00" )
-    # l = Grid_Fit("1927-05-1 00:00:00", "1930-12-31 00:00:00" , data_source= 'DIJA')
-    # plt.plot(l.data_series[0], l.data_series[1])
-    # l = Grid_Fit("1927-05-1 00:00:00", "1929-10-24 00:00:00" , data_source= 'DIJA')
-    # l.plot_solution( con = True, col = 'LogClose',scale = 24) #Recon data size issue
-    #l = Grid_Fit("2007-03-12 00:00:00", "2007-10-10 00:00:00" , data_source= 'SSE')
-    # wavelet = Wavelet_Wrapper( l.d.data['LogClose'].tolist() , padding = False)
-    # recon = pd.DataFrame( wavelet.reconstruct( level = 1 ) , columns = ['Recon'] )
-    # l.d.data['Recon'] = recon['Recon']
-    # l.data_series = l.d.get_data_series( direction = 1)
-    # print(" Dataseries shape =", l.data_series[0].shape) 
     #pl = Pipeline( l.d )
     #lpplfit = pl.model_lppl( l.data_series ) # returns 3 fits
     plt.show()
