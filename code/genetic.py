@@ -244,6 +244,52 @@ class Individual:
         ds = [lppl(t,self.cof) for t in self.data_series[0]]
         return ds
 
+
+class Lppl_Wrapper:
+
+    @property
+    def sse(self):
+        return self.__sse
+
+    @sse.setter
+    def sse(self, sse):
+        self.__sse = sse
+
+    @property
+    def model(self):
+        return self.__model
+
+    @model.setter
+    def model(self, model):
+        self.__model = model
+
+    def __init__ ( self, model, sse):
+        self.__model = model       
+        self.__sse = sse 
+        self.__tc = model[2]
+
+    @property
+    def tc(self):
+        return self.__tc
+
+    def generator (self, ts): #return fitting result using LPPL parameters
+        """
+        ts is a numpy array of time points starting from 0
+        """
+        #TODO check for errors. E.g. empty model
+        #TODO equation needs review. phi or -phi? B and C are different from the paper 
+        #TODO isert b inside the cos upper bracket 
+        x = self.model
+
+        values = lppl(ts, x)
+        return values 
+
+    def plot(self, ts, offset=0):
+        # Offset is to plot it on a full TS 
+        #plt.plot(ts + offset , list( self.generator(ts)[0] )  )
+        ts = ts + offset
+        print("plotting ts from point: ", ts[0])
+        plt.plot(ts , list( self.generator(ts) )  )
     # def getTradeDate(self):
     #     return date
 

@@ -74,25 +74,53 @@ class Data_Wrapper:
                 self.get_hourly_data()
             else:
                 self.get_lppl_data()
+        # Turn into dictoinary
+        elif data_source == 'SSE':
+            self.get_SSE_data()
         elif data_source == 'SP500':
-            self.get_SP500_data()
+            self.get_Historical_data( path = 'sp5001987.csv')
+        elif data_source == 'DIJA':
+            self.get_Historical_data( path = 'dija1929.csv')
         else:
             print("Invalid data source") #TODO raise error 
 
-    def get_SP500_data(self, path = 'Data\\EWS-QR-LPPL-data-master\\sp5001987.csv'):
+    def get_SSE_data ( self, path = 'Data\\SSE.csv'):
         df = None
         try:
-            df = DataFrame.from_csv( path)
-            df = DataFrame.from_csv( path).reset_index()
-            df.columns = ['Date', 'Price']
-            df['LogPrice'] = df['Price'].apply( lambda x: np.log(x))
+            names=[ "Date", "Price", "Open", "High", "Low", "Vol", "Change" ]
+            df = pd.read_csv( path , sep=',', parse_dates=['Date'], index_col='Date', 
+                                    names = names,
+                                    header= 0).reset_index()  
+            for col in names[1:4]:
+                df[ col] = df[ col].apply(lambda x: float( x.replace(',','') ) )
+            df['LogClose'] = df['Price'].apply( lambda x: np.log(x))
+            df['StrDate'] = df['Date']
+            df['Date'] = df['Date'].apply( lambda date: int(np.round((date - datetime(1970, 1, 1)).total_seconds()) ))
+        except BaseException as e:
+            print( e )
+        self.data = df
+        self.data_size = df['LogClose'].size
+        return df 
+
+    #Need to refactor and generalize
+
+
+    def get_Historical_data(self, path = 'sp5001987.csv'):
+        path = 'Data\\EWS-QR-LPPL-data-master\\' + path
+        df = None
+        try:
+            #names=[ "Date", "Price", "Open", "High", "Low", "Vol", "Change" ]
+            df = pd.read_csv( path , sep=',', names=['Date', 'Close'], parse_dates=['Date'], index_col='Date', 
+                                    header= 0).reset_index()  
+            df.columns = ['Date', 'Close']
+            df['LogClose'] = df['Close'].apply( lambda x: np.log(x))
             df['StrDate'] = df['Date']
             df['Date'] = df['Date'].apply( lambda date: int(np.round((date - datetime(1970, 1, 1)).total_seconds()) ))
             #df['Date'] = df['Date'].apply( lambda x: )
         except BaseException as e:
             print( e )
         self.data = df
-        self.data_size = df['LogPrice'].size
+        self.data_size = df['LogClose'].size
         return df 
 
     def get_lppl_data(self, date_from = '2015-09-01 00:00:00', date_to = '2015-10-24 00:00:00', force_read = False ):
@@ -141,11 +169,6 @@ class Data_Wrapper:
         data_size = data.size 
         #time = np.linspace( 0, data_size-1, data_size) #just a sequence 
         time = np.arange( data_size )
-        # Reversed data if direction is -1 
-        # if direction == 1:
-        #     close = [ data[ i] for i in range( 0 , data_size ) ]
-        # else:
-        #     close = [ data[ -i] for i in range( 1 , data_size + 1 )]
         values = (data if direction==1 else np.flip(data, axis=0) )
         dataSeries = [time, values]
         # Reset data size
@@ -170,7 +193,7 @@ class Data_Wrapper:
         Example date: 2017-09-17 11:00:00
         """
         df = self.data
-        print(df['Date'].size)        
+        print("Epoch from " , get_epoch( date_from) )
         df = df.loc[ df['Date'] >= get_epoch( date_from) ]
         df = df.loc[ df['Date'] <= get_epoch( date_to) ]
         df = df.reset_index()
@@ -228,9 +251,10 @@ class Data_Wrapper:
             print( e )
 
 if __name__ == "__main__":
-    d = Data_Wrapper( data_source= 'SP500')
-    d.filter_by_date( "1984-1-3 00:00:00", "1984-1-10 00:00:00")
-    print(d.data.head())
+    # d = Data_Wrapper( data_source= 'SP500')
+    # d.filter_by_date( "1984-1-3 00:00:00", "1984-1-10 00:00:00")
+    d = Data_Wrapper( data_source= 'DIJA')
+    d.filter_by_date( "1926-1-3 00:00:00", "1926-1-10 12:59:59")
 
 
 class Epsilon_Drawdown:
@@ -551,123 +575,6 @@ class Epsilon_Drawdown:
         potential_bubbles = self.potential_bubble_points( ntpk, threshold )
         points = [(d, self.data.LogClose[d]) for d in potential_bubbles]
         return points
-
-
-class Lagrange_regularizer:
-    """
-    Copyright: G.Demos @ ETH-Zurich - Jan.2017
-    Swiss Finance Institute
-    SSRN-id3007070
-    Guilherme DEMOS
-    Didier SORNETTE
-    """
-    __B_max = 0 #Power law amplitude
-    __m_range = np.arange(0,1,20).tolist()  #PL exponent [0,1]
-    __omeaga_range = np.arange(4, 25, 2).tolist() #LP frequency [4,25]
-    __D_min = 0.5 #Damping [0.5, inf]
-    __O_min = 2.5 #No of oscillations [2.5, inf]
-
-    def simulateOLS( self):
-        """ Generate synthetic OLS as presented in the paper """
-        nobs = 200
-        X = np.arange(0,nobs,1)
-        e = np.random.normal(0, 10, nobs)
-        beta = 0.5
-        Y = [beta*X[i] + e[i] for i in range(len(X))]
-        Y = np.array(Y)
-        X = np.array(X)
-        Y[:100] = Y[:100] + 4*e[:100]
-        Y[100:200] = Y[100:200]*8
-        return X, Y
-
-    def fitDataViaOlsGetBetaAndLine( self, X, Y):
-        """ Fit synthetic OLS """
-        beta_hat = np.dot(X.T,X)**-1. * np.dot(X.T,Y) # get beta
-        Y = [beta_hat*X[i] for i in range(len(X))]
-        # generate fit
-        return Y
-
-    def getSSE( self, Y, Yhat, p=1, normed=False):
-        """
-        Obtain SSE (chi^2)
-        p -> No. of parameters
-        Y -> Data
-        Yhat -> Model
-        """
-        error = (Y-Yhat)**2. #SSE
-        obj = np.sum(error) 
-        if normed == False:
-            obj = np.sum(error) 
-        else:
-            obj = 1/np.float(len(Y) - p) * np.sum(error)
-        return obj
-
-    def getSSE_and_SSEN_as_a_func_of_dt( self, normed=False, plot=False):
-        """ Obtain SSE and SSE/N for a given shrinking fitting window w """
-        # Simulate Initial Data
-        X, Y = self.simulateOLS()
-        # Get a piece of it: Shrinking Window
-        _sse = []
-        _ssen = []
-        for i in range(len(X)-10): # loop t1 until: t1 = (t2 - 10):
-            xBatch = X[i:-1]
-            yBatch = Y[i:-1]
-            YhatBatch = self.fitDataViaOlsGetBetaAndLine( xBatch, yBatch)
-            sse = self.getSSE(yBatch, YhatBatch, normed=False)
-            sseN = self.getSSE(yBatch, YhatBatch, normed=True)
-            _sse.append(sse)
-            _ssen.append(sseN)
-        if plot == False:
-            pass
-        else:
-            f, ax = plt.subplots( 1,1,figsize=(6,3) )
-            ax.plot( _sse, color= 'k')
-            a = ax.twinx()
-            a.plot( _ssen, color='b')
-            plt.tight_layout()
-        if normed == False: 
-            return _sse, _ssen, X, Y # returns results + data
-        else:
-            return _sse/max(_sse), _ssen/max(_ssen), X, Y # returns results + data
-    ########################    
-
-    def LagrangeMethod( self, sse):
-        """ Obtain the Lagrange regulariser for a given SSE/N """
-        # Fit the decreasing trend of the cost function
-        slope = self.calculate_slope_of_normed_cost(sse)
-        return slope[0]        
-
-    def calculate_slope_of_normed_cost( self, sse):
-        #Create linear regression object using statsmodels package
-        regr = linear_model.LinearRegression( fit_intercept=False)
-        # create x range for the sse_ds
-        x_sse = np.arange(len(sse))
-        x_sse = x_sse.reshape(len(sse),1)
-        # Train the model using the training sets
-        res = regr.fit(x_sse, sse)
-        return res.coef_
-    ########################
-
-    def obtainLagrangeRegularizedNormedCost( self, X, Y, slope):
-        """ Obtain the Lagrange regulariser for a given SSE/N Pt. III"""
-        Yhat = self.fitDataViaOlsGetBetaAndLine(X,Y) # Get Model fit
-        ssrn_reg = self.getSSE(Y, Yhat, normed=True) # Classical SSE
-        ssrn_lgrn = ssrn_reg - slope*len(Y) # SSE lagrange
-        return ssrn_lgrn
-    
-    def GetSSEREGvectorForLagrangeMethod( self, X, Y, slope):
-        """
-        X and Y used for calculating the original SSEN
-        slope is the beta of fitting OLS to the SSEN
-        """
-        # Estimate the cost function pondered by lambda using a Shrinking Window.
-        _ssenReg = []
-        for i in range(len(X)-10):
-            xBatch = X[i:-1]
-            yBatch = Y[i:-1]
-            regLag = self.obtainLagrangeRegularizedNormedCost(xBatch, yBatch, slope)
-            _ssenReg.append(regLag)
-        return _ssenReg
 
 # if __name__ == "__main__":
 #     pass
