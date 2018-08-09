@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from scipy.optimize import fmin_tnc, least_squares, minimize, basinhopping, differential_evolution
 import random
 import pandas as pd
@@ -228,7 +229,7 @@ class Nonlinear_Fit:
         Set con = True. to search with the below constraints
         """
         def print_fun(x, f, accepted):
-            print("at minima %.8f accepted %d" % (f, int(accepted)))
+            print("Found minima %.8f, accepted %d" % (f, int(accepted)))
         class MyTakeStep(object):
             def __init__(self, stepsize=0.5): #0.5 for hourly
                 self.stepsize = stepsize
@@ -247,20 +248,24 @@ class Nonlinear_Fit:
            
         a = (.5, np.inf)
         b = (-np.inf, -0.001)
-        tc = (self.d.data_size, 1.4*self.d.data_size )
+        # Now tc represet a fractional year instead of a time index
+        time_head = self.data_series[0][self.d.data_size-1]+0.01
+        tc = (time_head, time_head+0.4 ) #look 3 months in advance (.25)
+        # old time index limits
+        #tc = (self.d.data_size, 1.4*self.d.data_size )
         m = (0.1, 0.9)
-        c1 = (-np.inf, np.inf)
+        c1 = c2 =  (-1, 1)
         w = (3,25)
-        c2 = (-np.inf, np.inf)
 
         limits = (a, b, tc, m, c1, w, c2)
-        bounds = [(.5, 10000), (-10000, -0.001), (self.d.data_size, 1.4*self.d.data_size )
+        bounds = [(.5, 10000), (-10000, -0.001), (time_head, time_head +.4 )
         , (0.1, 0.9), (-100, 100), (3,25), (-100, 100) ]
         #initial guess inline with what parameters represent
         x0 = np.array( 
             [ np.average(self.data_series[1]) , 
              - (np.amax(self.data_series[1])-np.amin(self.data_series[1]) ),
-             self.d.data_size, 0.5, 1, 7, -1])
+             time_head, 0.5, 1, 7, -1])
+        print("Initial guess: ", x0)
         xmin = [a[0], b[0], tc[0], m[0], c1[0], w[0], c2[0]]
         xmax = [a[1], b[1], tc[1], m[1], c1[1], w[1], c2[1]]
 
@@ -280,7 +285,7 @@ class Nonlinear_Fit:
                         { 'type': 'eq', 'fun': self.conC1 },
                         { 'type': 'eq', 'fun': self.conC2 },
                     ]
-        options = { 'maxiter': 10000 ,'ftol': 1e-8}
+        options = { 'maxiter': 100000 ,'ftol': 1e-6}
         print("Minimizing..., method: ", method)
         # methods: SLSQP, 
         # Nelder-Mead: Simplex does not work in the below form
@@ -295,13 +300,16 @@ class Nonlinear_Fit:
         # mybounds = MyBounds( xmin, xmax )
         if method == 'basinhopping':
             solution = basinhopping( self.objective, x0, minimizer_kwargs=minimizer_kwargs,
-                        T= 1 ,niter=20, niter_success = 3, take_step = mytakestep, callback= print_fun )        
+                        T= 2 ,niter=30, take_step = mytakestep, callback= print_fun )        
         else: # Either basinhopping or differential evolution 
             solution = differential_evolution( self.objective, bounds= bounds, 
                         tol=1e-4, maxiter=10000)        
 
         #print( "Minimization completed in %.2f seconds" % (time.time()-then) )
-        crash = (solution.x[2]- self.d.data_size)/24. 
+        # Now crash is a real point in time
+        crash = solution.x[2] 
+        # old crash calculation based on time index
+        #crash = (solution.x[2]- self.d.data_size)/24. 
         x = solution.x
         print( "x0: ", x0 )
         print( "Solution: A= %.3f, B=%.3f, Crash=%.2f, m=%.2f ,c1=%.2f ,w=%.2f ,c2=%.2f. Cost=%.5f" 
@@ -316,20 +324,23 @@ class Nonlinear_Fit:
         """
         Scale represents the number of hours 
         """
-        plt.plot(self.d.data[ col ])
-        self.data_series = self.d.get_data_series( direction = 1, col = col)
+        self.data_series = self.d.get_data_series( direction = 1, col = col, fraction= 1)
+        plt.plot(self.data_series[0], self.data_series[1] )
         solution, crash = self.solve ( method = method )
         model_data = lpplc1( self.data_series[0], solution.x )
-        label = method + " optimization - crash in %.2f days" % (crash*scale) 
+        from epsilon import to_year_from_fraction
+        crash_time = to_year_from_fraction(crash).strftime( "%d/%m/%Y" )
+        label = method + " optimization - crash date: " + crash_time
+        # Old time index
+        #label = method + " optimization - crash in %.2f days" % (crash*scale) 
         plt.plot( self.data_series[0], model_data, label= label )
         plt.legend(loc='upper center',shadow=True, fontsize='medium')
         plt.xlabel("t" )
         plt.ylabel("Log P(t)")
-        # solution = self.minimize ( data_series[0], data_series[1])
         #A , #B, Tc, m, c, omega, phi
 
     def plot_cost (self, col = 'LogClose'):
-        from mpl_toolkits.mplot3d import Axes3D
+        # from mpl_toolkits.mplot3d import Axes3D
         from matplotlib import cm
         from matplotlib.ticker import LinearLocator, FormatStrFormatter
 
@@ -374,7 +385,7 @@ class Nonlinear_Fit:
         # plt.plot(tc_range, obj)
 
 def run( Test = False, date1 = "2017-11-1 00:00:00", date2= "2017-12-16 00:00:00" ):
-    l = Grid_Fit("1999-11-1 00:00:00", "2017-12-16 00:00:00" )
+    l = Nonlinear_Fit("1999-11-1 00:00:00", "2017-12-16 00:00:00" )
     #l.plot_solution( con = True)
     d = Data_Wrapper( hourly = True)
     d.filter_by_date( date1, date2 )
@@ -429,8 +440,10 @@ if __name__ == "__main__":
     random.seed(1)
     # l = Grid_Fit("2017-1-1 00:00:00", "2017-12-10 00:00:00" )
     # plt.plot(l.data_series[0], l.data_series[1])
-    l = Nonlinear_Fit("2017-10-1 00:00:00", "2017-12-10 00:00:00" )
-    # Parameters 
+    #l = Nonlinear_Fit("2017-10-1 00:00:00", "2017-12-10 00:00:00" )
+    #l = Nonlinear_Fit("1984-07-30 00:00:00", "1987-06-12 00:00:00" , data_source= 'SP500')
+    l = Nonlinear_Fit("1984-09-30 00:00:00", "1987-06-12 00:00:00" , data_source= 'SP500')
+     # Parameters 
     # c1 = c *cos(phi), c2 = c * sin (phi)
     # 
     # a, b, tc, m, c, w, phi

@@ -13,6 +13,7 @@ import time
 from time import sleep
 from sklearn import linear_model
 from datetime import datetime,  timedelta
+import calendar 
 
 from crawlers.crawler import Crawler
 from decomposition import Wavelet_Wrapper 
@@ -33,10 +34,34 @@ def get_date_from_epoch( epoch):
     str_time = t.strftime( date_format )
     return str_time
 
-def get_epoch( date_str):
+def get_epoch( date_str): #change to use the sinceEpoch function
     utc_time = datetime.strptime( date_str, date_format)
     epoch_time = (utc_time - datetime(1970, 1, 1)).total_seconds()
     return int( np.round( epoch_time))
+
+def sinceEpoch(date): # returns seconds since epoch
+        return time.mktime(date.timetuple())
+
+def toYearFraction(epoch):
+    t1 = time.gmtime( epoch)
+    year = t1.tm_year
+    startOfThisYear = datetime(year=year, month=1, day=1)
+    startOfNextYear = datetime(year=year+1, month=1, day=1)
+    yearElapsed = epoch - sinceEpoch(startOfThisYear)
+    yearDuration = sinceEpoch(startOfNextYear) - sinceEpoch(startOfThisYear)
+    fraction = yearElapsed/yearDuration
+    return year + fraction
+
+def to_year_from_fraction(fraction):
+    year = int(np.floor(fraction))
+    remainder = fraction - year 
+    startOfThisYear = datetime(year=year, month=1, day=1)
+    startOfNextYear = datetime(year=year+1, month=1, day=1)
+    yearDuration = sinceEpoch(startOfNextYear) - sinceEpoch(startOfThisYear)
+    year_epoch = remainder*yearDuration + sinceEpoch(startOfThisYear)
+    t1 = time.gmtime( year_epoch)
+    t = datetime(t1.tm_year, t1.tm_mon, t1.tm_mday, t1.tm_hour, t1.tm_min, t1.tm_sec)
+    return t
 
 class Data_Wrapper:
     @property
@@ -157,9 +182,11 @@ class Data_Wrapper:
         self.data_size = dataSeries[0].size
         return dataSeries
     
-    def get_data_series( self, index =0, to = -1, direction = 1, col = 'LogClose'):
+    def get_data_series( self, index =0, to = -1, direction = 1, col = 'LogClose', fraction = 0):
         """
         Direction: +/- 1
+        fraction is a flag. if set to 0 (default): dataSeries[0] is time points indexed from 0
+        if set to 1: return fractional year. Example: 2018.604060 for 9/8/2018
         """
         if direction not in [-1,1]:
             direction = 1 #Should raise some error 
@@ -168,7 +195,11 @@ class Data_Wrapper:
         data = np.array( data[index: to] if to>-1 else data[index:] ) 
         data_size = data.size 
         #time = np.linspace( 0, data_size-1, data_size) #just a sequence 
-        time = np.arange( data_size )
+        time = None
+        if fraction: #apply a filter then convert to numpy array
+            time = self.data['Date'].apply( lambda epoch: toYearFraction( epoch) ).values
+        else:
+            time = np.arange( data_size )
         values = (data if direction==1 else np.flip(data, axis=0) )
         dataSeries = [time, values]
         # Reset data size
