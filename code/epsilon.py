@@ -295,10 +295,12 @@ class Epsilon_Drawdown:
     and further used in (Johansen and Sornette, 2010; Filimonov and Sornette, 2015).
     """
     #__threshold = 0.1
-    __threshold = 0.6
-    __DST = 0.65 #Short term threshold
-    __DLT = 0.95 #Long term thresold
-
+    #__threshold = 0.6
+    __DST = 0.3 #Short term threshold
+    __DLT = 0.65 #Long term thresold
+    #Originals Sornette Thresholds
+    # __DST = 0.65 #Short term threshold
+    # __DLT = 0.95 #Long term thresold
     #Only getters
     @property
     def short_threshold(self):
@@ -337,7 +339,8 @@ class Epsilon_Drawdown:
         """
 
         #Round to 1 decimal place
-        return np.around( [i for i in np.arange( 1.0 , 2.1, 0.1)], 1).tolist()
+        return np.around( [i for i in np.arange( 2 , 3 , .3)], 1).tolist()
+        #return np.around( [i for i in np.arange( 1.1 , 1.3 , 0.1)], 1).tolist()
         # return np.around( [i for i in np.arange( 0.1 , 2.1, 0.1)], 1).tolist()
         #return np.around( [i for i in np.arange( 0.1 , 5.1, 0.1)], 1).tolist()
 
@@ -346,6 +349,7 @@ class Epsilon_Drawdown:
         The time window search space is used to calculate the sliding volatility 
         """
         return range( 12 ,241, 12) #20 different volatility windows 
+        # return range( 12 ,241, 12) #20 different volatility windows 
         #return range( 10 ,61, 5) #Daily 
 
     def __init__ (self , data , col = 'LogClose'):
@@ -369,16 +373,14 @@ class Epsilon_Drawdown:
         such as: 
         https://quant.stackexchange.com/questions/30173/what-volatility-estimator-for-continuous-data-and-small-time-window
         """
-        window_data = self.data[self.col][ (i- window if i> window-1 else 0): i]
+        window_data = self.data[self.col].values[ (i- window if i> window-1 else 0): i]
         vol = window_data.std()
         return 0.01 if np.isnan(vol) else vol
-
     def epsilon (self, e0, i, w):
         """
         Calculate the stop tolerance Epsilon E(e0,w)=e0*volatility(i, w)
         """
         return e0 * self.volatility(i, w)
-
     def get_peaks(self):
         epsilon_list = []
         #Grid search for different e0 and time windows
@@ -386,7 +388,6 @@ class Epsilon_Drawdown:
             epsilon = (e0,w, self.epsilon( e0, w, w))
             epsilon_list.append( epsilon  )
         return epsilon_list
-
     def log_return(self, i):
         """
         r(i) = ln P[ti] - ln P[ti-1]; i = 1,2,... 
@@ -395,7 +396,6 @@ class Epsilon_Drawdown:
         if i>0:
             r = self.data[self.col].values[i]-self.data[self.col].values[i-1]
         return r
-    
     def __p(self, i0, i):
         """
         cum_log_return
@@ -409,7 +409,6 @@ class Epsilon_Drawdown:
         except:
             print("stopped at i=", i)
             return 0
-
     def __argm (self, elements, func):
         l = np.array(elements)
         argm = func(l) 
@@ -540,6 +539,7 @@ class Epsilon_Drawdown:
             u = u.union( set(item) )
         return u
     def total_search_space(self):
+        #Total no. of WindowxEpsilon search combinations
         return len( self.window_search_space() ) * len( self.e0_search_space() ) 
     def Ntpk (self, tpeaks):
         """
@@ -560,7 +560,6 @@ class Epsilon_Drawdown:
         
         ntpk_tuples = [ (peak,fraction) for  peak, fraction  in  zip( u, fractions) ]
         return ntpk_tuples
-
     def volatility_spectrum(self, plot = False):
         """
         Calculates the volatility of each data point on a sliding window and using different 
@@ -573,45 +572,54 @@ class Epsilon_Drawdown:
         for w,i in [(window, point) for window in  window_space for point in range( 0,self.data_size)]:
             #Find volatility for each window for each data point
             v.append( self.volatility( i,w) )
+        print( "Max. volatility %.5f" % np.amax(v) )
+        print( "min. volatility %.5f" % np.amin(v) )
+        print( "Volatility sd %.5f" % np.std(v) )
+
         v = np.reshape( v, ( len( window_space) , self.data_size) )
+
         if plot:
             for i in range(len(v)): 
                 plt.plot(v[i])
             plt.show()
         return v
-    
     def threshold_spectrum( self, e0 ):
         """
         Epsilon(e0, w, i) = e0 * volatility(w, i)
         Or just multiplying e0 by the volatility spectrum
         """
         v = np.array( self.volatility_spectrum() )
-        return np.multiply( v, e0 ).tolist()
-
+        spectrum = np.multiply( v, e0 ).tolist()
+        return spectrum
     def potential_bubble_points(self, ntpk, threshold ):
         """
         Potential long term bubble: Ntp,k>=DLT for k=1,...,Ntp
         Potential short term bubble: Ntp,k>=DST and k<DLT for k=1,...,Ntp.  Excluding potential long term 
         """
         lst = []
+        #Sort by the first item of the ntpk tuple
         if threshold == self.__DST: # short term bubble
             #ntpk is a tuple list of peaks and their fractions
             # TODO avoid constructing a list and write a efficient code 
             lst = [ x[0] for x in ntpk if x[1] >= self.__DST and x[1] < self.__DLT ]
-        else:
+        elif threshold == self.__DLT:
             lst = [ x[0] for x in ntpk if x[1] >= self.__DLT ]
+        else: #All
+            lst = [ x[0] for x in ntpk if x[1] >= self.__DST]
 
         return lst
-    
     def get_bubbles (self, threshold ):
         """
         Return: List of tuples
         """
         tp = self.tpeaks( plot = False )
         ntpk = self.Ntpk( tp)
+        ntpk = sorted(ntpk, key=lambda x: x[0] )
+        print("Ntpk:\n", ntpk)
         potential_bubbles = self.potential_bubble_points( ntpk, threshold )
-        points = [(d, self.data[self.col][d]) for d in potential_bubbles]
-        dated_points = [(toYearFraction(self.data.Date[d]), self.data[self.col][d]) for d in potential_bubbles]
+        print("Potential bubbles:\n", potential_bubbles)
+        points = [(d, self.data[self.col].values[d]) for d in potential_bubbles]
+        dated_points = [(toYearFraction(self.data.Date.values[d]), self.data[self.col].values[d]) for d in potential_bubbles]
         return points, dated_points
 
 # if __name__ == "__main__":
