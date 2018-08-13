@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
+import matplotlib.cm
 from scipy.optimize import fmin_tnc, least_squares, minimize, basinhopping, differential_evolution
 import random
 import pandas as pd
@@ -11,10 +12,14 @@ import itertools
 from sklearn.metrics import mean_squared_error
 from sklearn import metrics
 from sklearn.cluster import KMeans
-
-from epsilon import Data_Wrapper, Epsilon_Drawdown
-from decomposition import Wavelet_Wrapper  
 import time
+
+from epsilon import Data_Wrapper, Epsilon_Drawdown, to_year_from_fraction
+from decomposition import Wavelet_Wrapper  
+
+def format_func(x, pos):
+    t= to_year_from_fraction(x)
+    return t.strftime( "%Y-%m-%d" )
 
 class Pipeline:
     @property
@@ -24,26 +29,167 @@ class Pipeline:
     def data_wrapper( self, data_wrapper):
         self.__data_wrapper = data_wrapper
 
-    def __init__ (self, data_Wrapper):
-        self.data_wrapper = data_Wrapper
+    @property 
+    def data_series(self):
+        return self.__data_series
+    @data_series.setter
+    def data_series(self, data_series):
+        self.__data_series = data_series 
 
-    def do_pass ( self, level =1 ):
+    @property 
+    def wavelet_data_series(self):
+        return self.__wavelet_data_series
+    @wavelet_data_series.setter
+    def wavelet_data_series(self, wavelet_data_series):
+        self.__wavelet_data_series = wavelet_data_series 
+
+    @property 
+    def nonlinear_fit(self):
+        return self.__nonlinear_fit
+    @nonlinear_fit.setter
+    def nonlinear_fit(self, nonlinear_fit):
+        self.__nonlinear_fit = nonlinear_fit 
+
+    def __init__ (self, date1, date2, data_source = 'BTC' ):
+        self.data_wrapper = Data_Wrapper( hourly = True, data_source = data_source )
+        self.data_wrapper.trim_by_date( date1, date2)
+        self.set_dataseries(date1=None, date2=None )
+        self.wavelet_recon( level= 1, fraction= 1)
+
+    def set_dataseries(self, date1= None, date2=None, fraction = 1):
+        d = self.data_wrapper
+        data = d.data
+        if date1 and date2: #Only if dates are entered 
+            data = d.filter_by_date( date1, date2) #Return a df. Does not update the underlying data 
+        data_series = d.get_data_series( data, direction = 1, fraction = fraction)
+        self.data_series = data_series
+
+    def set_dataseries_by_loc ( self, f=0, t=-1, fraction = 1):
+        d = self.data_wrapper
+        data_series = d.get_data_series( d.data.iloc[f:t] , direction = 1, fraction = fraction)
+        self.data_series = data_series
+
+    def wavelet_recon ( self, level =1, fraction=1):
+        data_series = self.data_series
+        wavelet = Wavelet_Wrapper( data_series[1].tolist() , padding = False)
+        recon = wavelet.reconstruct( level = level )
+        ap = data_series[1].size-recon.size 
+        recon = pd.DataFrame( np.append( [np.nan]*ap , recon ), columns = ['Recon'] )
+        self.data_wrapper.data['Recon']= recon
+        return self.data_wrapper.data
+
+    def wavelet_recon_by_loc ( self, f=0, t=-1, level =1, fraction=1):
+        data_series = [ self.data_series[0][f:t], self.data_series[1][f:t] ]
+        wavelet = Wavelet_Wrapper( data_series[1].tolist() , padding = False)
+        recon = pd.DataFrame( wavelet.reconstruct( level = level ) , columns = ['Recon'] )
+        data = self.data_wrapper.data.iloc[f:t]
+        data['Recon'] = recon['Recon']
+        self.wavelet_data_series =\
+            self.data_wrapper.get_data_series( data, direction = 1, col='Recon', fraction =1)
+        return self.wavelet_data_series
+
+    def do_pass ( self, level =1 , plot=True ):
         #Will modify wavelet to accept a series 
-        if level > 0:
-            wavelet = Wavelet_Wrapper( self.data_wrapper.data['LogClose'].tolist() , padding = False)
-        #for level in range(1, wavelet.coeffs_size):
-        # plt.close('all')
-            recon = pd.DataFrame( wavelet.reconstruct( level ) , columns = ['LogClose'] )
-        else:
-            recon = self.data_wrapper.data
+        if level>0:
+            self.wavelet_recon( )
+        recon = self.data_wrapper.data
+        #     recon = self.data_wrapper.data
         # TODO bug this class depends on LogClose
-        l = Epsilon_Drawdown( recon )
+        # recon = self.data_wrapper.data
+        l = Epsilon_Drawdown( recon, col='LogClose' if level==0 else 'Recon')
         # l.data.LogClose.plot()
-        potential_bubble_points = l.get_bubbles ( l.long_threshold )
-        # plt.scatter(*zip(*draw_points) )
+        potential_bubble_points, plot_points = l.get_bubbles ( l.long_threshold )
+        print( plot_points )
+
+        plt.scatter(*zip(*plot_points) )
+        if level>0:
+            data_series = self.data_wrapper.get_data_series( recon, col='Recon')
+        else:
+            data_series = self.data_series
+
+        plt.plot( data_series[0], data_series[1] )
+
         # plt.savefig("Bubblepoints-level-%2d.png" % level )
         #plt.show()
-        return recon, potential_bubble_points
+        return potential_bubble_points
+    
+    def run(self, Test = False ):
+        # self.set_dataseries(date1, date2)
+        # l = Nonlinear_Fit( self.data_series)
+        #l.plot_solution( con = True)
+        # d = Data_Wrapper( hourly = True)
+        # d.filter_by_date( date1, date2 )
+        # pl = Pipeline( d )
+
+        #TODO Get bubble points. Uncomment
+        #bubble_points = self.do_pass (level = 0) 
+        # #Add reconstructed data
+        # d.data = data
+        # print( bubble_points )
+        # plt.plot( self.data_series[0], self.data_series[1])
+        self.do_pass(level=1)
+        # plt.scatter( *zip(*bubble_points) )
+        # print("Bubble points size: ", len(bubble_points) )
+
+        #for i in range( 1, len(bubble_points ) ):
+        # for i in range( 1, 2 ):
+        #     _to = 200
+        #     _from = 1
+        #     # _to = bubble_points[i][0]
+        #     # _from = bubble_points[i-1][0]
+        #     print("Fitting data from peak point %d to point %d " % (_from, _to) )
+        #     data_size = _to - _from + 1
+        #     points = []
+        #     # for step in range(0, data_size-240,12 ): #skip 12 time points and recalculate
+        #     #TODO test range. Use the above 
+        #     if data_size > 48:
+        #         print("Data size:", data_size )
+        #         #for step in range( 0, data_size - 24, 12 ): #skip 12 time points and recalculate
+        #         for step in [0]: 
+        #         #for step in range(0, data_size - 240, 12 ): #skip 12 time points and recalculate
+        #             # respective minimum and maximum values ​​of the seven parameters fitting process
+        #             data_series = d.get_data_series( index = _from+ step, to=_to,  direction = 1) 
+        #             dt = data_series[0].size
+        #             #lppl = pl.model_lppl( data_series ) # returns 3 fits
+        #             print("Step: %d, dt: %d" % (step, dt))
+
+                    #x = lppl.Population(limits, 20, 0.3, 1.5, .05, 4)
+                    # points.append( (lppl[0].tc-dt, dt ) )
+                    # for i in range(3):
+                    #     lppl[i].plot( data_series[0], offset = step + _from )
+            # plt.scatter( *zip( *points) )
+            # plt.gca().set_xlabel('tc-t2')
+            # plt.gca().set_ylabel('dt = t2-t1')
+            # clusters, labels = cluster(points, 4)
+            # plt.scatter( *zip( *clusters) )
+            # plt.show(block=True)
+            # print( metrics.silhouette_score(points, labels) )
+            # print ( "Clusters: ", clusters )
+
+if __name__ == "__main__":
+    # start date 17/9/2013
+    # plt.show(block=True)
+    wavelet_flag = False
+    random.seed()
+    # plt.plot(l.data_series[0], l.data_series[1])
+    date1, date2 = "2017-11-01 00:00:00", "2017-12-10 00:00:00"
+    p = Pipeline(date1, date2, data_source='BTC')
+    p.run()
+    #plt.plot(p.data_series[0], p.data_series[1])
+    #plt.gca().xaxis.set_major_formatter(matplotlib.ticker.StrMethodFormatter("{x:.2f}"))
+    plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
+    plt.show()
+    # l = Nonlinear_Fit()
+    # l.set_dataseries (date1=date1, date2= date2, data_source= 'BTC')
+    # #l = Nonlinear_Fit("1984-07-30 00:00:00", "1987-06-12 00:00:00" , data_source= 'SP500')
+    # # l = Nonlinear_Fit("1984-09-21 00:00:00", "1987-08-06 00:00:00" , data_source= 'SP500')
+    # if wavelet_flag:
+    #     l.wavelet_recon()
+    #     l.plot_solution( method= 'basinhopping' )
+    # else:
+    #     # l.plot_solution(col = 'LogClose', method= 'basinhopping' )
+    #     l.plot_solution( method= 'basinhopping' )
+
 
 
 def cluster (points, n_clusters =2 ):
@@ -85,12 +231,15 @@ def lpplc1 (t,x): #return fitting result using LPPL parameters
         print( "(tc=%d,t=%d)"% (tc,t) )
 
 class Nonlinear_Fit:
-    @property
-    def d(self):
-        return self.__d
-    @d.setter
-    def d(self, d):
-        self.__d = d
+    # @property
+    # def d(self):
+    #     return self.__d
+    # @d.setter
+    # def d(self, d):
+    #     self.__d = d
+    def __init__(self, data_series = None ):
+        #self.data_wrapper = data_wrapper
+        self.data_series = data_series
 
     @property
     def data_series(self):
@@ -99,19 +248,35 @@ class Nonlinear_Fit:
     def data_series(self, data_series):
         self.__data_series = data_series
     
-    def __init__(self, date1 = "2017-12-1 00:00:00", date2= "2017-12-5 00:00:00", data_source = 'BTC'):
-        d = Data_Wrapper( hourly = True, data_source = data_source)
-        d.filter_by_date( date1, date2)
-        self.d = d
-        self.data_series = d.get_data_series( direction = 1)
+    @property
+    def data_wrapper(self):
+        return self.__data_wrapper
+    @data_wrapper.setter
+    def data_wrapper(self, data_wrapper):
+        self.__data_wrapper = data_wrapper
 
+    # def set_dataseries(self, date1 = "2017-12-1 00:00:00", date2= "2017-12-5 00:00:00", data_source = 'BTC', fraction = 1):
+    #     #Move up
+    #     d = Data_Wrapper( hourly = True, data_source = data_source )
+    #     d.filter_by_date( date1, date2) #returns None. updates the underlying data 
+    #     # self.d = d
+    #     data_series = d.get_data_series( direction = 1, fraction = fraction)
+    #     self.data_wrapper = d
+    #     self.data_series = data_series
+    
+    # def wavelet_recon( self, level=1):
+    #     # move up. Dataseries now only holds wavelet or original data
+    #     if self.data_series:
+    #         wavelet = Wavelet_Wrapper( self.data_series[1].tolist() , padding = False)
+    #         recon = pd.DataFrame( wavelet.reconstruct( level = level ) , columns = ['Recon'] )
+    #         self.data_wrapper.data['Recon'] = recon['Recon']
+    #         self.data_series = self.data_wrapper.get_data_series( direction = 1, col='Recon', fraction =1)
 
     def fi(self, tc, t, m):
         """
         Used for the matrix analytic solution of the linear parameters
         """
         return np.power( tc-t, m)
-
     def sum_fi(self, tc, m):
         return np.sum( np.power( tc-self.data_series[0], m) )  
     def sum_gi (self, tc, m, w ):
@@ -149,8 +314,6 @@ class Nonlinear_Fit:
     def sum_fi_hi( self, tc, m, w ):
         t = self.data_series[0]
         return np.sum( np.multiply ( np.power( tc-self.data_series[0], 2*m) , np.sin( ( w*np.log( tc-t )) ) ) ) 
-    
-
     def linear_constraint (self, x):
         """
         Fits A, B, C1, C2 according to an analytic solution given tc, m, w
@@ -163,7 +326,7 @@ class Nonlinear_Fit:
         b = np.array( [self.sum_yi(), self.sum_yi_fi(tc, m), self.sum_yi_gi (tc, m, w), self.sum_yi_gi (tc, m, w) ] ).T
         sol = None
         mat = np.array( 
-            [[ self.d.data_size, self.sum_fi(tc, m), self.sum_gi( tc, m, w), self.sum_hi( tc, m, w)],
+            [[ self.data_series[0].size, self.sum_fi(tc, m), self.sum_gi( tc, m, w), self.sum_hi( tc, m, w)],
             [self.sum_fi( tc, m), self.sum_fi_square(tc, m), self.sum_fi_gi(tc, m, w), self.sum_fi_hi(tc, m, w)],
             [self.sum_gi(tc, m, w), self.sum_fi_gi(tc, m, w), self.sum_gi_square( tc, m, w), self.sum_gi_hi( tc, m, w)],
             [self.sum_hi( tc, m, w) , self.sum_fi_hi( tc, m, w) , self.sum_gi_hi ( tc, m, w) , self.sum_hi_square (tc, m, w)] ]
@@ -176,7 +339,6 @@ class Nonlinear_Fit:
             print( e ," Could not invert:" )
             print(mat)
         return sol
-
     def conA (self, x):
         sol = self.linear_constraint(x)
         #limits = ( a, b, tc, m, c1, w, c2)
@@ -197,21 +359,18 @@ class Nonlinear_Fit:
         #limits = ( a, b, tc, m, c1, w, c2)
         obj = sol[3]-x[6] #for the minimize function to work. Objective must be 0. Or so I understand!
         return obj
-
     def sse(self, y, yest):
         """
         Both are array-like of the same shape (n,)
         Returns: Sum-squared error 
         """
         return  np.sum( np.power( y-yest, 2) )
-
     def rms(self, y, yest):
         """
         Both are array-like of the same shape (n,)
         Returns: Sum-squared error 
         """
         return  np.sqrt( np.sum( np.power( y-yest, 2) ) /y.size )
-
     def objective(self, x):
         t = self.data_series[0]
         y = self.data_series[1]
@@ -223,8 +382,7 @@ class Nonlinear_Fit:
         obj = self.rms(y, yest) 
         #print("objective= ", obj )
         return obj
-
-    def solve (self, method = 'basinhopping' ):
+    def solve (self, method = 'basinhopping', niter = 10 ):
         """
         Set con = True. to search with the below constraints
         """
@@ -249,12 +407,13 @@ class Nonlinear_Fit:
         a = (.5, 1000)
         b = (-1000, -0.001)
         # Now tc represet a fractional year instead of a time index
-        time_head = self.data_series[0][self.d.data_size-1]+0.01
+        data_size = self.data_series[0].size
+        time_head = self.data_series[0][data_size-1]+0.01
         tc = (time_head, time_head+0.4 ) #look 3 months in advance (.25)
         # old time index limits
         #tc = (self.d.data_size, 1.4*self.d.data_size )
         m = (0.1, 0.9)
-        c1 = c2 =  (-10, 10)
+        c1 = c2 =  (-1, 1)
         w = (3,25)
 
         limits = (a, b, tc, m, c1, w, c2)
@@ -286,14 +445,11 @@ class Nonlinear_Fit:
                         { 'type': 'eq', 'fun': self.conC1 },
                         { 'type': 'eq', 'fun': self.conC2 },
                     ]
-        options = { 'maxiter': 100000 ,'ftol': 1e-6}
+        options = { 'maxiter': 10000 ,'ftol': 1e-5}
         print("Minimizing..., method: ", method)
         # methods: SLSQP, 
         # Nelder-Mead: Simplex does not work in the below form
         # Bounded: L-BFGS-B, TNC, SLSQP
-        # solution = minimize( self.objective ,x0 ,method='SLSQP',bounds=limits,\
-        #                     constraints=[conA, conB, conC1, conC2],\
-        #                     options= options )
         minimizer_kwargs = { "method": "SLSQP", "constraints": constraints ,
                              "options": options, "bounds": limits
                            } #
@@ -301,11 +457,14 @@ class Nonlinear_Fit:
         # mybounds = MyBounds( xmin, xmax )
         if method == 'basinhopping':
             solution = basinhopping( self.objective, x0, minimizer_kwargs=minimizer_kwargs,
-                        T= 1 ,niter=40, take_step = mytakestep, callback= print_fun )        
+                        T= 0.5 , niter=niter, take_step = mytakestep, callback= print_fun )   
+        elif method == 'SLSQP':     
+            solution = minimize( self.objective ,x0 ,method='SLSQP',bounds=limits,\
+                                constraints=constraints,\
+                                options= options )
         else: # Either basinhopping or differential evolution 
             solution = differential_evolution( self.objective, bounds= bounds, 
-                        tol=1e-6, maxiter=100000)        
-
+                        tol=1e-5, maxiter=10000)        
         #print( "Minimization completed in %.2f seconds" % (time.time()-then) )
         # Now crash is a real point in time
         crash = solution.x[2] 
@@ -320,13 +479,12 @@ class Nonlinear_Fit:
         print( "ConC1: ", str( self.conC1(solution.x)) )
         print( "ConC2: ", str( self.conC2(solution.x)) )
         return solution, crash 
-
-    def plot_solution (self, col = 'LogClose', scale = 1, method= 'basinhopping'):
+    def plot_solution (self, scale = 1, method= 'basinhopping'):
         """
         Scale represents the number of hours 
         """
-        self.data_series = self.d.get_data_series( direction = 1, col = col, fraction= 1)
-        plt.plot(self.data_series[0], self.data_series[1] )
+        # self.data_series = self.d.get_data_series( direction = 1, col = col, fraction= 1)
+        plt.plot(self.data_series[0], self.data_series[1], label='data' )
         solution, crash = self.solve ( method = method )
         model_data = lpplc1( self.data_series[0], solution.x )
         from epsilon import to_year_from_fraction
@@ -339,18 +497,18 @@ class Nonlinear_Fit:
         plt.xlabel("t" )
         plt.ylabel("Log P(t)")
         #A , #B, Tc, m, c, omega, phi
-
     def plot_cost (self, col = 'LogClose'):
         # from mpl_toolkits.mplot3d import Axes3D
+        # TODO Need maint
         from matplotlib import cm
         from matplotlib.ticker import LinearLocator, FormatStrFormatter
 
-        self.data_series = self.d.get_data_series( direction = 1, col = col)
+        # self.data_series = self.get_data_series( direction = 1, col = col)
         solution, _ = self.solve( )
         x = solution.x
         print(solution)
         tc = x[2]
-        tc_range = np.linspace(self.d.data_size, 1.2*tc, 500)        
+        # tc_range = np.linspace(self.d.data_size, 1.2*tc, 500)        
         m_range = np.linspace(.1, .9, 100)     
         w_range = np.linspace(3, 25, 100)
         M,W = np.meshgrid( m_range, w_range )
@@ -385,80 +543,4 @@ class Nonlinear_Fit:
         #     obj[i] = self.objective(x)
         # plt.plot(tc_range, obj)
 
-def run( Test = False, date1 = "2017-11-1 00:00:00", date2= "2017-12-16 00:00:00" ):
-    l = Nonlinear_Fit("1999-11-1 00:00:00", "2017-12-16 00:0f0:00" )
-    #l.plot_solution( con = True)
-    d = Data_Wrapper( hourly = True)
-    d.filter_by_date( date1, date2 )
-    pl = Pipeline( d )
-
-    #TODO Get bubble points. Uncomment
-    # data, bubble_points = pl.do_pass (level = 0) 
-    # #Add reconstructed data
-    # d.data = data
-    # print( bubble_points )
-    plt.plot( d.data['LogClose'])
-    # plt.scatter( *zip(*bubble_points) )
-    # print("Bubble points size: ", len(bubble_points) )
-
-    #for i in range( 1, len(bubble_points ) ):
-    for i in range( 1, 2 ):
-        _to = 200
-        _from = 1
-        # _to = bubble_points[i][0]
-        # _from = bubble_points[i-1][0]
-        print("Fitting data from peak point %d to point %d " % (_from, _to) )
-        data_size = _to - _from + 1
-        points = []
-        # for step in range(0, data_size-240,12 ): #skip 12 time points and recalculate
-        #TODO test range. Use the above 
-        if data_size > 48:
-            print("Data size:", data_size )
-            #for step in range( 0, data_size - 24, 12 ): #skip 12 time points and recalculate
-            for step in [0]: 
-            #for step in range(0, data_size - 240, 12 ): #skip 12 time points and recalculate
-                # respective minimum and maximum values ​​of the seven parameters fitting process
-                data_series = d.get_data_series( index = _from+ step, to=_to,  direction = 1) 
-                dt = data_series[0].size
-                #lppl = pl.model_lppl( data_series ) # returns 3 fits
-                print("Step: %d, dt: %d" % (step, dt))
-                #x = lppl.Population(limits, 20, 0.3, 1.5, .05, 4)
-                # points.append( (lppl[0].tc-dt, dt ) )
-                # for i in range(3):
-                #     lppl[i].plot( data_series[0], offset = step + _from )
-        # plt.scatter( *zip( *points) )
-        # plt.gca().set_xlabel('tc-t2')
-        # plt.gca().set_ylabel('dt = t2-t1')
-        # clusters, labels = cluster(points, 4)
-        # plt.scatter( *zip( *clusters) )
-        # plt.show(block=True)
-        # print( metrics.silhouette_score(points, labels) )
-        # print ( "Clusters: ", clusters )
-
-if __name__ == "__main__":
-    # start date 17/9/2013
-    # plt.show(block=True)
-    random.seed()
-    # l = Grid_Fit("2017-1-1 00:00:00", "2017-12-10 00:00:00" )
-    # plt.plot(l.data_series[0], l.data_series[1])
-    #l = Nonlinear_Fit("2017-10-1 00:00:00", "2017-12-10 00:00:00" )
-    #l = Nonlinear_Fit("1984-07-30 00:00:00", "1987-06-12 00:00:00" , data_source= 'SP500')
-    l = Nonlinear_Fit("1984-09-21 00:00:00", "1987-08-06 00:00:00" , data_source= 'SP500')
-    wavelet = Wavelet_Wrapper( l.d.data['LogClose'].tolist() , padding = False)
-    recon = pd.DataFrame( wavelet.reconstruct( level = 1 ) , columns = ['Recon'] )
-    l.d.data['Recon'] = recon['Recon']
-    l.data_series = l.d.get_data_series( direction = 1, col='Recon', fraction =1)
-    l.plot_solution(col = 'Recon', method= 'basinhopping' )
-
-     # Parameters 
-    #l.plot_solution(  col = 'LogClose',scale = 1) #Recon data size issue
-    # l.plot_solution(col = 'LogClose', method= 'basinhopping' )
-    # plt.close('all')
-    # l = Grid_Fit("2017-10-15 00:00:00", "2017-12-10 00:00:00" )
-    # l.plot_solution( con = True, col = 'LogClose',scale = 1) #Recon data size issue
-    # plt.show()
-
-    #pl = Pipeline( l.d )
-    #lpplfit = pl.model_lppl( l.data_series ) # returns 3 fits
-    plt.show()
 

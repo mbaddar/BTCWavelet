@@ -90,3 +90,28 @@ def run1( search = True):
         # for l in __2dplist:
         #     print(len(l), " elements: [" , ",".join( [str("{0:.2f}".format(i)) for i in l ]), "]"  )
         #print("Done plist")
+
+#Data_Wrapper
+  # def get_data_series( self, index =0, to = -1, direction = 1, col = 'LogClose', fraction = 0):
+    #     """
+    #     Direction: +/- 1
+    #     fraction is a flag. if set to 0 (default): dataSeries[0] is time points indexed from 0
+    #     if set to 1: return fractional year. Example: 2018.604060 for 9/8/2018
+    #     """
+    #     if direction not in [-1,1]:
+    #         direction = 1 #Should raise some error 
+    #     # Remove na first 
+    #     data = self.data[ col ][self.data[ col ].notna()]
+    #     data = np.array( data[index: to] if to>-1 else data[index:] ) 
+    #     data_size = data.size 
+    #     #time = np.linspace( 0, data_size-1, data_size) #just a sequence 
+    #     time = None
+    #     if fraction: #apply a filter then convert to numpy array
+    #         time = self.data['Date'].apply( lambda epoch: toYearFraction( epoch) ).values[:data_size]
+    #     else:
+    #         time = np.arange( data_size )
+    #     values = (data if direction==1 else np.flip(data, axis=0) )
+    #     dataSeries = [time, values]
+    #     # Reset data size
+    #     self.data_size = data_size        
+    #     return dataSeries

@@ -135,21 +135,28 @@ if __name__ == "__main__":
     path = "2018"
     c = Crawler()
     # Create a DataFrame from the crawled files
+    # 17/09/2013 to 06/07/2018
     df2 = c.get_complete_df ( path, ['close', 'high'] )
+
     #Extracts a list of the close data
     # data = df2['close'].tolist()[-4096:]
-    data = df2['close'].tolist()
+    data = df2['close'][-8096:]
+    print(data.head())
+    print(data.tail())
     # data = df2['close'].tolist()[-32768:]
-    d = Wavelet_Wrapper( data, padding = False)
-    print("data size :" ,len(d.data) )
+    d = Wavelet_Wrapper( data.tolist(), padding = False)
     coeffs = d.wavelet_decomposition( )
+    recon = d.reconstruct( level = 1)
     #wavelet_decomposition [cA_n, cD_n, cD_n-1, …, cD2, cD1]
 
     # reconstruction 
     #plt.subplot(2,1,1) #row, col, index
-    # plt.plot( d.data )
-    plt.plot (d.reconstruct( level = 1), color='red' )
-    
+    plt.plot( d.data, label='Original Data' )
+    plt.plot (recon, color='red', label='Wavelet Reconstruction' )
+    plt.xlabel("t: 22/10/2017 to 06/07/2018")
+    plt.ylabel("USD")
+    plt.title("Wavelet reconstruction of Bitcoin USD Price")
+    plt.legend(loc='upper right',shadow=True, fontsize='medium')
     plt.show()
     
     #d.plot_coefficients( coeffs, "db8")
