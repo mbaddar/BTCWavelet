@@ -1,11 +1,8 @@
 from __future__ import division
 
 import matplotlib.pyplot as plt
-<<<<<<< HEAD
 import numpy as np
-=======
-from crawler import Crawler
->>>>>>> parent of 4600d51... Adding Genetic Algorithm
+from crawlers import Crawler
 #pip install pycwt
 #Conda does not work
 import pycwt as wavelet
