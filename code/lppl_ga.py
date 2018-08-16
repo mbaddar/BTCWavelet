@@ -50,9 +50,13 @@ class Pipeline:
     def nonlinear_fit(self, nonlinear_fit):
         self.__nonlinear_fit = nonlinear_fit 
 
-    def __init__ (self, date1=None, date2=None, data_source = 'BTC' ):
+    def __init__ (self, date1=None, date2=None, data_source = 'BTC', count =0 ):
         self.data_wrapper = Data_Wrapper( hourly = True, data_source = data_source )
-        if date1 and date2:
+        if count !=0: #Count from both ends of the time series. The other end idetified by date
+            # +ve count from left (earlier) end. -ve from right (later) end
+            #Extract count no. of data points from/to date1
+            self.data_wrapper.trim_by_date_and_count( date1 if count>0 else date2, count)
+        elif date1 and date2:
             self.data_wrapper.trim_by_date( date1, date2)
         self.set_dataseries( )
         self.wavelet_recon( level= 1, fraction= 1)
@@ -101,7 +105,8 @@ class Pipeline:
         # l.data.LogClose.plot()
         #potential_bubble_points, plot_points = l.get_bubbles ( l.long_threshold )
         potential_bubble_points, plot_points = l.get_bubbles ( -1 ) #all
-        print( plot_points )
+        plot_dates = [ ( to_year_from_fraction(point[0]).strftime( "%Y-%m-%d" ), point[1] )  for point in plot_points]
+        print( plot_dates )
 
         plt.scatter(*zip(*plot_points), color='red' )
         if level>0:
@@ -110,12 +115,14 @@ class Pipeline:
             data_series = self.data_series
 
         plt.plot( data_series[0], data_series[1] )
-
+        plt.title("BTC Peak Points")
+        plt.xlabel("t")
+        plt.ylabel("Ln P")
         # plt.savefig("Bubblepoints-level-%2d.png" % level )
         #plt.show()
         return potential_bubble_points
     
-    def run(self, Test = False ):
+    def run(self, level = 0, Test = False ):
         # self.set_dataseries(date1, date2)
         # l = Nonlinear_Fit( self.data_series)
         #l.plot_solution( con = True)
@@ -129,7 +136,7 @@ class Pipeline:
         # d.data = data
         # print( bubble_points )
         # plt.plot( self.data_series[0], self.data_series[1])
-        self.do_pass(level=0)
+        self.do_pass(level=level)
         # plt.scatter( *zip(*bubble_points) )
         # print("Bubble points size: ", len(bubble_points) )
 
@@ -174,10 +181,12 @@ if __name__ == "__main__":
     wavelet_flag = False
     random.seed()
     # plt.plot(l.data_series[0], l.data_series[1])
-    date1, date2 = "2017-11-01 00:00:00", "2017-12-10 00:00:00"
-    #p = Pipeline(date1, date2, data_source='BTC')
-    p = Pipeline()
-    p.run()
+    date1, date2 = "2012-11-01 00:00:00", "2018-1-1 00:00:00"
+    #date1, date2 = "2015-11-01 00:00:00", "2014-8-1 00:00:00"
+#    p = Pipeline(date1, date2, data_source='BTC', count=8192)32768
+    p = Pipeline(date1, date2, data_source='BTC', count=32768)
+    # p = Pipeline()
+    p.run(level=1)
     #plt.plot(p.data_series[0], p.data_series[1])
     #plt.gca().xaxis.set_major_formatter(matplotlib.ticker.StrMethodFormatter("{x:.2f}"))
     plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )

@@ -45,7 +45,7 @@ class Wavelet_Wrapper:
     def coeffs_size(self, coeffs_size):
         self.__coeffs_size = coeffs_size
 
-    def __init__ (self, data, wavelet_name ='db8', padding = True):
+    def __init__ (self, data, wavelet_name ='db24', padding = True):
         data_size = len(data)
         # Either 0 pad or trim
         if not self.power2( data_size):

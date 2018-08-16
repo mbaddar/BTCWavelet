@@ -64,6 +64,10 @@ def to_year_from_fraction(fraction):
     return t
 
 class Data_Wrapper:
+    """
+    from: 17/09/2013 9 am
+    to: 06/07/2018 4 pm
+    """
     @property
     def lppl_data(self):
         return self.__lppl_data
@@ -224,6 +228,24 @@ class Data_Wrapper:
         df = df.drop(['index'], axis=1)
         self.data = df
         self.data_size = df['Date'].size
+    def trim_by_date_and_count(self, date, count):
+        """
+        Example date: 2017-09-17 11:00:00
+        Extract count number of data points from/to date
+        +ve count from left (earlier) end. -ve from right (later) end
+        """
+        df = self.data
+        if count>0: #Trip from the start date
+            df = df.loc[ df['Date'] >= get_epoch( date) ]
+            df = df.iloc[ :count ]
+        else: #negative count. trim from the end date
+            df = df.loc[ df['Date'] <= get_epoch( date) ]
+            df = df.iloc[ count: ]
+
+        df = df.reset_index()
+        df = df.drop(['index'], axis=1)
+        self.data = df
+        self.data_size = df['Date'].size
     def filter_by_date(self, date_from, date_to):
         """
         Example date: 2017-09-17 11:00:00
@@ -296,7 +318,7 @@ class Epsilon_Drawdown:
     """
     #__threshold = 0.1
     #__threshold = 0.6
-    __DST = 0.3 #Short term threshold
+    __DST = 0.65 #Short term threshold
     __DLT = 0.65 #Long term thresold
     #Originals Sornette Thresholds
     # __DST = 0.65 #Short term threshold
@@ -339,7 +361,8 @@ class Epsilon_Drawdown:
         """
 
         #Round to 1 decimal place
-        return np.around( [i for i in np.arange( 2 , 3 , .3)], 1).tolist()
+        return np.around( [i for i in np.arange( 5 , 6 , .3)], 1).tolist()
+        # return np.around( [i for i in np.arange( 1 , 6 , .3)], 1).tolist()
         #return np.around( [i for i in np.arange( 1.1 , 1.3 , 0.1)], 1).tolist()
         # return np.around( [i for i in np.arange( 0.1 , 2.1, 0.1)], 1).tolist()
         #return np.around( [i for i in np.arange( 0.1 , 5.1, 0.1)], 1).tolist()
@@ -348,7 +371,7 @@ class Epsilon_Drawdown:
         """
         The time window search space is used to calculate the sliding volatility 
         """
-        return range( 12 ,241, 12) #20 different volatility windows 
+        return range( 72 ,361, 24) # 
         # return range( 12 ,241, 12) #20 different volatility windows 
         #return range( 10 ,61, 5) #Daily 
 
@@ -373,7 +396,9 @@ class Epsilon_Drawdown:
         such as: 
         https://quant.stackexchange.com/questions/30173/what-volatility-estimator-for-continuous-data-and-small-time-window
         """
-        window_data = self.data[self.col].values[ (i- window if i> window-1 else 0): i]
+        # Data are either taken from (i-window, i) if i>=window 
+        # or (o, window) otherwise
+        window_data = self.data[self.col].values[ (i- window if i> window-1 else 0): (i if i> window-1 else window)]
         vol = window_data.std()
         return 0.01 if np.isnan(vol) else vol
     def epsilon (self, e0, i, w):
