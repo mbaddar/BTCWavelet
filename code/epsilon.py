@@ -501,8 +501,10 @@ class Epsilon_Drawdown:
         if self.log_return(i)<=0: #Drawup
             drawup = first_drawup = False
         #Alternate between drawup and drawdown
-        draws,breaks = [],[]
-        i1, br = self.i1(0, epsilon, drawup= drawup) #find the peak drawup
+        # draws,breaks = [],[]
+        draws = []
+        # i1, br = self.i1(0, epsilon, drawup= drawup) #find the peak drawup
+        i1, _ = self.i1(0, epsilon, drawup= drawup) #find the peak drawup
         while i < self.data_size-1: #find if a drawup or drawdown
             # print("Found ", ("drawup " if drawup else "drawdown "), "at ", str(i1))
             draws.append(i1)

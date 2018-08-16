@@ -175,35 +175,6 @@ class Pipeline:
             # print( metrics.silhouette_score(points, labels) )
             # print ( "Clusters: ", clusters )
 
-if __name__ == "__main__":
-    # start date 17/9/2013
-    # plt.show(block=True)
-    wavelet_flag = False
-    random.seed()
-    # plt.plot(l.data_series[0], l.data_series[1])
-    date1, date2 = "2012-11-01 00:00:00", "2018-1-1 00:00:00"
-    #date1, date2 = "2015-11-01 00:00:00", "2014-8-1 00:00:00"
-#    p = Pipeline(date1, date2, data_source='BTC', count=8192)32768
-    p = Pipeline(date1, date2, data_source='BTC', count=32768)
-    # p = Pipeline()
-    p.run(level=1)
-    #plt.plot(p.data_series[0], p.data_series[1])
-    #plt.gca().xaxis.set_major_formatter(matplotlib.ticker.StrMethodFormatter("{x:.2f}"))
-    plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
-    plt.show()
-    # l = Nonlinear_Fit()
-    # l.set_dataseries (date1=date1, date2= date2, data_source= 'BTC')
-    # #l = Nonlinear_Fit("1984-07-30 00:00:00", "1987-06-12 00:00:00" , data_source= 'SP500')
-    # # l = Nonlinear_Fit("1984-09-21 00:00:00", "1987-08-06 00:00:00" , data_source= 'SP500')
-    # if wavelet_flag:
-    #     l.wavelet_recon()
-    #     l.plot_solution( method= 'basinhopping' )
-    # else:
-    #     # l.plot_solution(col = 'LogClose', method= 'basinhopping' )
-    #     l.plot_solution( method= 'basinhopping' )
-
-
-
 def cluster (points, n_clusters =2 ):
     kmeans = KMeans(init='k-means++', n_clusters= n_clusters, n_init=10).fit(points)
     return kmeans.cluster_centers_, kmeans.labels_
@@ -242,13 +213,9 @@ def lpplc1 (t,x): #return fitting result using LPPL parameters
     except BaseException:
         print( "(tc=%d,t=%d)"% (tc,t) )
 
+day_fraction = 0.0027
+
 class Nonlinear_Fit:
-    # @property
-    # def d(self):
-    #     return self.__d
-    # @d.setter
-    # def d(self, d):
-    #     self.__d = d
     def __init__(self, data_series = None ):
         #self.data_wrapper = data_wrapper
         self.data_series = data_series
@@ -399,20 +366,23 @@ class Nonlinear_Fit:
         Set con = True. to search with the below constraints
         """
         def print_fun(x, f, accepted):
-            print("Found minima %.8f, accepted %d" % (f, int(accepted)))
+            print("New minima %.8f %s. Solution: A= %.3f, B=%.3f, Crash=%s, m=%.2f ,c1=%.2f ,w=%.2f ,c2=%.2f." 
+                %(f, "accepted" if accepted else "not accepted" ,
+                 x[0],x[1], to_year_from_fraction(x[2]) , x[3],x[4],x[5],x[6]) )
         class MyTakeStep(object):
             def __init__(self, stepsize=0.5): #0.5 for hourly
                 self.stepsize = stepsize
             def __call__(self, x):
                 s = self.stepsize
-                x[0] += np.random.uniform(-5.*s, 5.*s) #a
-                x[1] += np.random.uniform(-4.*s, 4.*s) #b
-                x[2] += np.random.uniform(-24.*s, 24.*s) #tc
-                x[3] += np.random.uniform(-.2*s, .2*s) #m
-                x[4] += np.random.uniform(-s, s) #c1
-                x[5] += np.random.uniform(-6.*s, 6.*s) #w
-                x[6] += np.random.uniform(-s, s) #c2
-                #x[1:] += np.random.uniform(-s, s, x[1:].shape)
+                x[0] += np.random.uniform( s, s) #a
+                x[1] += np.random.uniform(-2.*s, 2.*s) #b
+                x[2] += np.random.uniform( -day_fraction, day_fraction ) #1/365, roughly a day 
+                #tc TODO tc should move very slightly as it now resembles fractional year 
+                x[3] += np.random.uniform(-.1, .1) #m
+                x[4] += np.random.uniform(-0.5*s, 0.5*s) #c1
+                x[5] += np.random.uniform(-4.*s, 4.*s) #w
+                x[6] += np.random.uniform(-0.5*s, 0.5*s) #c2
+                print("Step: [" , ", ".join( [str("{0:.3f}".format(i)) for i in x ]), "]"  )
                 return x    
 
            
@@ -420,10 +390,8 @@ class Nonlinear_Fit:
         b = (-1000, -0.001)
         # Now tc represet a fractional year instead of a time index
         data_size = self.data_series[0].size
-        time_head = self.data_series[0][data_size-1]+0.01
+        time_head = self.data_series[0][data_size-1]+ day_fraction 
         tc = (time_head, time_head+0.4 ) #look 3 months in advance (.25)
-        # old time index limits
-        #tc = (self.d.data_size, 1.4*self.d.data_size )
         m = (0.1, 0.9)
         c1 = c2 =  (-1, 1)
         w = (3,25)
@@ -434,9 +402,13 @@ class Nonlinear_Fit:
         # , (0.1, 0.9), (-100, 100), (3,25), (-100, 100) ]
         #initial guess inline with what parameters represent
         x0 = np.array( 
-            [ np.average(self.data_series[1]) , 
-             - (np.amax(self.data_series[1])-np.amin(self.data_series[1]) ),
-             time_head, 0.5, 1, 3, -1])
+            [ np.average(self.data_series[1]) , #a
+             - (np.amax(self.data_series[1])-np.amin(self.data_series[1]) ), #b
+             time_head, #tc
+             0.5, #m
+             0.5, #c1
+             3, #w 
+             -0.5]) #c2
         print("Initial guess: ", x0)
         xmin = [a[0], b[0], tc[0], m[0], c1[0], w[0], c2[0]]
         xmax = [a[1], b[1], tc[1], m[1], c1[1], w[1], c2[1]]
@@ -457,7 +429,7 @@ class Nonlinear_Fit:
                         { 'type': 'eq', 'fun': self.conC1 },
                         { 'type': 'eq', 'fun': self.conC2 },
                     ]
-        options = { 'maxiter': 10000 ,'ftol': 1e-5}
+        options = { 'maxiter': 1000 ,'ftol': 1e-4}
         print("Minimizing..., method: ", method)
         # methods: SLSQP, 
         # Nelder-Mead: Simplex does not work in the below form
@@ -469,14 +441,14 @@ class Nonlinear_Fit:
         # mybounds = MyBounds( xmin, xmax )
         if method == 'basinhopping':
             solution = basinhopping( self.objective, x0, minimizer_kwargs=minimizer_kwargs,
-                        T= 0.5 , niter=niter, take_step = mytakestep, callback= print_fun )   
+                        T= 1 , niter=niter, take_step = mytakestep, callback= print_fun )   
         elif method == 'SLSQP':     
             solution = minimize( self.objective ,x0 ,method='SLSQP',bounds=limits,\
                                 constraints=constraints,\
                                 options= options )
         else: # Either basinhopping or differential evolution 
             solution = differential_evolution( self.objective, bounds= bounds, 
-                        tol=1e-5, maxiter=10000)        
+                        tol=1e-6, maxiter=100000)        
         #print( "Minimization completed in %.2f seconds" % (time.time()-then) )
         # Now crash is a real point in time
         crash = solution.x[2] 
@@ -484,22 +456,21 @@ class Nonlinear_Fit:
         #crash = (solution.x[2]- self.d.data_size)/24. 
         x = solution.x
         print( "x0: ", x0 )
-        print( "Solution: A= %.3f, B=%.3f, Crash=%.2f, m=%.2f ,c1=%.2f ,w=%.2f ,c2=%.2f. Cost=%.5f" 
-                %(x[0],x[1],x[2], x[3],x[4],x[5],x[6], solution.fun))
+        print( "Solution: A= %.3f, B=%.3f, Crash=%s, m=%.2f ,c1=%.2f ,w=%.2f ,c2=%.2f. Cost=%.5f" 
+                %(x[0],x[1],to_year_from_fraction(x[2]) , x[3],x[4],x[5],x[6], solution.fun))
         print( "ConA: ", str( self.conA(solution.x)) )
         print( "ConB: ", str( self.conB(solution.x)) )
         print( "ConC1: ", str( self.conC1(solution.x)) )
         print( "ConC2: ", str( self.conC2(solution.x)) )
         return solution, crash 
-    def plot_solution (self, scale = 1, method= 'basinhopping'):
+    def plot_solution (self, scale = 1, method= 'basinhopping', niter= 10):
         """
         Scale represents the number of hours 
         """
         # self.data_series = self.d.get_data_series( direction = 1, col = col, fraction= 1)
         plt.plot(self.data_series[0], self.data_series[1], label='data' )
-        solution, crash = self.solve ( method = method )
+        solution, crash = self.solve ( method = method , niter= niter)
         model_data = lpplc1( self.data_series[0], solution.x )
-        from epsilon import to_year_from_fraction
         crash_time = to_year_from_fraction(crash).strftime( "%d/%m/%Y" )
         label = method + " optimization - crash date: " + crash_time
         # Old time index
@@ -507,7 +478,7 @@ class Nonlinear_Fit:
         plt.plot( self.data_series[0], model_data, label= label )
         plt.legend(loc='upper center',shadow=True, fontsize='medium')
         plt.xlabel("t" )
-        plt.ylabel("Log P(t)")
+        plt.ylabel("Ln P")
         #A , #B, Tc, m, c, omega, phi
     def plot_cost (self, col = 'LogClose'):
         # from mpl_toolkits.mplot3d import Axes3D
@@ -555,4 +526,28 @@ class Nonlinear_Fit:
         #     obj[i] = self.objective(x)
         # plt.plot(tc_range, obj)
 
+
+if __name__ == "__main__":
+    # start date 17/9/2013
+    # plt.show(block=True)
+    wavelet_flag = False
+    random.seed()
+    date1, date2 = "2017-7-08 00:00:00", "2017-12-1 00:00:00"
+    #p = Pipeline(date1, date2, data_source='BTC', count=32768)
+    p = Pipeline(date1, date2, data_source='BTC', count=0)
+#    p.run(level=1)
+    # #l = Nonlinear_Fit("1984-07-30 00:00:00", "1987-06-12 00:00:00" , data_source= 'SP500')
+    # # l = Nonlinear_Fit("1984-09-21 00:00:00", "1987-08-06 00:00:00" , data_source= 'SP500')
+    l = Nonlinear_Fit (p.data_series)
+    l.plot_solution( method= 'basinhopping', niter=20 )
+    # if wavelet_flag:
+    #     l.wavelet_recon()
+    #     l.plot_solution( method= 'basinhopping' )
+    # else:
+    #     # l.plot_solution(col = 'LogClose', method= 'basinhopping' )
+    #     l.plot_solution( method= 'basinhopping' )
+    #plt.plot(p.data_series[0], p.data_series[1])
+    #plt.gca().xaxis.set_major_formatter(matplotlib.ticker.StrMethodFormatter("{x:.2f}"))
+    plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
+    plt.show()
 
