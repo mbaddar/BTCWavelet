@@ -13,8 +13,6 @@ from sklearn.metrics import mean_squared_error
 from sklearn import metrics
 from sklearn.cluster import KMeans
 import time
-import sys, os
-import struct
 
 from epsilon import Data_Wrapper, Epsilon_Drawdown, to_year_from_fraction
 from decomposition import Wavelet_Wrapper  
@@ -22,15 +20,6 @@ from decomposition import Wavelet_Wrapper
 def format_func(x, pos):
     t= to_year_from_fraction(x)
     return t.strftime( "%Y-%m-%d" )
-
-day_fraction = 0.0027
-old_stdout = sys.stdout
-
-def shift_to_log(file = "message.log" ):
-    log_file = open( file,"w")
-    sys.stdout = log_file
-    return log_file
-
 
 class Pipeline:
     @property
@@ -210,23 +199,25 @@ def lppl (t,x): #return fitting result using LPPL parameters
 def lpplc1 (t,x): #return fitting result using LPPL parameters. C1 and C2 remove phi
     a = x[0] 
     b = x[1]
-    tc = x[2]/365+x[7] #tc days as a fraction of a year+ timehead. 
+    tc = x[2]
     m = x[3]
     c1 = x[4]
     w = x[5]
     c2 = x[6]
     try:
         # return a + ( b*np.power( np.abs(tc-t), m) ) *(1 + ( c*np.cos((w*np.log( np.abs( tc-t ) ))+phi)))
-        pwr = np.float_power( tc-t, m)
+        pwr = np.power( tc-t, m)
         lg = w*np.log( tc-t )
-        values = a + pwr * ( b + c1* np.cos( lg)+ c2* np.sin( lg) )
-        return values
+        fun = a + pwr * (b  + c1 * np.cos( lg ) + c2* np.sin( lg ) )
+        return fun
     except BaseException:
         print( "(tc=%d,t=%d)"% (tc,t) )
 
+day_fraction = 0.0027
 
 class Nonlinear_Fit:
     def __init__(self, data_series = None ):
+        #self.data_wrapper = data_wrapper
         self.data_series = data_series
 
     @property
@@ -236,6 +227,30 @@ class Nonlinear_Fit:
     def data_series(self, data_series):
         self.__data_series = data_series
     
+    @property
+    def data_wrapper(self):
+        return self.__data_wrapper
+    @data_wrapper.setter
+    def data_wrapper(self, data_wrapper):
+        self.__data_wrapper = data_wrapper
+
+    # def set_dataseries(self, date1 = "2017-12-1 00:00:00", date2= "2017-12-5 00:00:00", data_source = 'BTC', fraction = 1):
+    #     #Move up
+    #     d = Data_Wrapper( hourly = True, data_source = data_source )
+    #     d.filter_by_date( date1, date2) #returns None. updates the underlying data 
+    #     # self.d = d
+    #     data_series = d.get_data_series( direction = 1, fraction = fraction)
+    #     self.data_wrapper = d
+    #     self.data_series = data_series
+    
+    # def wavelet_recon( self, level=1):
+    #     # move up. Dataseries now only holds wavelet or original data
+    #     if self.data_series:
+    #         wavelet = Wavelet_Wrapper( self.data_series[1].tolist() , padding = False)
+    #         recon = pd.DataFrame( wavelet.reconstruct( level = level ) , columns = ['Recon'] )
+    #         self.data_wrapper.data['Recon'] = recon['Recon']
+    #         self.data_series = self.data_wrapper.get_data_series( direction = 1, col='Recon', fraction =1)
+
     def fi(self, tc, t, m):
         """
         Used for the matrix analytic solution of the linear parameters
@@ -271,23 +286,23 @@ class Nonlinear_Fit:
         return np.sum( np.multiply( self.data_series[1], np.multiply( np.power( tc-t, m) , np.sin( ( w*np.log( tc-t ))) ) ) )  
     def sum_fi_gi(self, tc, m, w):
         t = self.data_series[0]
-        return np.sum( np.multiply( np.power( tc-self.data_series[0], 2.*m),  np.cos( ( w*np.log( tc-t ))) ) ) 
+        return np.sum( np.multiply( np.power( tc-self.data_series[0], 2*m),  np.cos( ( w*np.log( tc-t ))) ) ) 
     def sum_gi_hi (self, tc, m, w ):
         t = self.data_series[0]
-        return np.sum( np.multiply( np.multiply( np.power( tc-t, 2.*m), np.cos( ( w*np.log( tc-t ))) ) ,np.sin( ( w*np.log( tc-t ))) ) ) 
+        return np.sum( np.multiply( np.multiply( np.power( tc-t, 2*m), np.cos( ( w*np.log( tc-t ))) ) ,np.sin( ( w*np.log( tc-t ))) ) ) 
     def sum_fi_hi( self, tc, m, w ):
         t = self.data_series[0]
-        return np.sum( np.multiply ( np.power( tc-self.data_series[0], 2.*m) , np.sin( ( w*np.log( tc-t )) ) ) ) 
+        return np.sum( np.multiply ( np.power( tc-self.data_series[0], 2*m) , np.sin( ( w*np.log( tc-t )) ) ) ) 
     def linear_constraint (self, x):
         """
         Fits A, B, C1, C2 according to an analytic solution given tc, m, w
         Returns a vector of A, B, C1, C2
         """
-        tc = x[2]/365+x[7] #tc days as a fraction of a year+ timehead.
+        tc = x[2]
         m = x[3]
         w = x[5]
         from numpy.linalg import inv
-        b = np.array( [self.sum_yi(), self.sum_yi_fi(tc, m), self.sum_yi_gi (tc, m, w), self.sum_yi_hi (tc, m, w) ] ).T
+        b = np.array( [self.sum_yi(), self.sum_yi_fi(tc, m), self.sum_yi_gi (tc, m, w), self.sum_yi_gi (tc, m, w) ] ).T
         sol = None
         mat = np.array( 
             [[ self.data_series[0].size, self.sum_fi(tc, m), self.sum_gi( tc, m, w), self.sum_hi( tc, m, w)],
@@ -323,12 +338,12 @@ class Nonlinear_Fit:
         #limits = ( a, b, tc, m, c1, w, c2)
         obj = sol[3]-x[6] #for the minimize function to work. Objective must be 0. Or so I understand!
         return obj
-    def mse(self, y, yest):
+    def sse(self, y, yest):
         """
         Both are array-like of the same shape (n,)
-        Returns: Mean-squared error 
+        Returns: Sum-squared error 
         """
-        return  np.sum( np.power( y-yest, 2) )/y.size
+        return  np.sum( np.power( y-yest, 2) )
     def rms(self, y, yest):
         """
         Both are array-like of the same shape (n,)
@@ -336,6 +351,7 @@ class Nonlinear_Fit:
         """
         return  np.sqrt( np.sum( np.power( y-yest, 2) ) /y.size )
     def objective(self, x):
+        
         t = self.data_series[0]
         y = self.data_series[1]
         yest = lpplc1(t, x)
@@ -343,111 +359,128 @@ class Nonlinear_Fit:
         # Still unsure about the global minima 
         #obj = self.sse(y, yest)
         # Experimenting: constraints should be 0
-        # obj = self.rms(y, yest) 
-        obj = self.mse(y, yest) 
+        obj = self.rms(y, yest) 
+        #print("objective= ", obj )
         return obj
     def solve (self, method = 'basinhopping', niter = 10 ):
         """
         Set con = True. to search with the below constraints
         """
-        rnd = struct.unpack("<I", os.urandom( 4 ))[0]
-        np.random.seed( rnd )
-
         def print_fun(x, f, accepted):
-            print("New minima %.8f %s. Solution: A= %.3f, B=%.3f, Crash=%.2f days from %s, m=%.2f ,c1=%.2f ,w=%.2f ,c2=%.2f." 
+            print("New minima %.8f %s. Solution: A= %.3f, B=%.3f, Crash=%s, m=%.2f ,c1=%.2f ,w=%.2f ,c2=%.2f." 
                 %(f, "accepted" if accepted else "not accepted" ,
-                 x[0], x[1], x[2] , to_year_from_fraction(x[7]), x[3], x[4], x[5], x[6]) )
-        a = (.5, 100)
-        b = (-100, -0.001)
-        # Now tc represet a fractional year instead of a time index
-        data_size = self.data_series[0].size
-        time_head = self.data_series[0][data_size-1]+ day_fraction 
-        tc = (0, 30 ) #look 3 months in advance
-        m = (0.1, 0.9)
-        c1 = c2 =  (-1, 1)
-        w = (3,25)
-        
+                 x[0],x[1], to_year_from_fraction(x[2]) , x[3],x[4],x[5],x[6]) )
         class MyTakeStep(object):
             def __init__(self, stepsize=0.5): #0.5 for hourly
                 self.stepsize = stepsize
             def __call__(self, x):
-                #s = self.stepsize
-                x[0] += np.random.uniform( -100, 100) #a
-                x[1] += np.random.uniform( -100, 100) #b
-                x[2] += np.random.uniform( -10, 10 ) #moves 1 day +/-. Tc now represents days
-                x[3] += np.random.uniform( -.8, .8) #m
-                x[4] += np.random.uniform( -2, 2) #c1
-                x[5] += np.random.uniform( -22, 22) #w
-                x[6] += np.random.uniform( -2, 2 ) #c2
-                #print("Step: [" , ", ".join( [str("{0:.3f}".format(i)) for i in x ]), "]"  )
+                s = self.stepsize
+                x[0] += np.random.uniform( s, s) #a
+                x[1] += np.random.uniform(-2.*s, 2.*s) #b
+                x[2] += np.random.uniform( -day_fraction, day_fraction ) #1/365, roughly a day 
+                #tc TODO tc should move very slightly as it now resembles fractional year 
+                x[3] += np.random.uniform(-.1, .1) #m
+                x[4] += np.random.uniform(-0.5*s, 0.5*s) #c1
+                x[5] += np.random.uniform(-4.*s, 4.*s) #w
+                x[6] += np.random.uniform(-0.5*s, 0.5*s) #c2
+                print("Step: [" , ", ".join( [str("{0:.3f}".format(i)) for i in x ]), "]"  )
                 return x    
 
-        limits = (a, b, tc, m, c1, w, c2, (time_head,time_head))
+           
+        a = (.5, 1000)
+        b = (-1000, -0.001)
+        # Now tc represet a fractional year instead of a time index
+        data_size = self.data_series[0].size
+        time_head = self.data_series[0][data_size-1]+ day_fraction 
+        tc = (time_head, time_head+0.4 ) #look 3 months in advance (.25)
+        m = (0.1, 0.9)
+        c1 = c2 =  (-1, 1)
+        w = (3,25)
+
+        limits = (a, b, tc, m, c1, w, c2)
         bounds = list(limits) 
         # bounds = [(.5, 10000), (-10000, -0.001), (time_head, time_head +.4 )
         # , (0.1, 0.9), (-100, 100), (3,25), (-100, 100) ]
         #initial guess inline with what parameters represent
         x0 = np.array( 
-            [  np.random.uniform( a[0], np.average(self.data_series[1]) ) , #a
-             - np.random.uniform( b[1], (np.amax(self.data_series[1])-np.amin(self.data_series[1]) ) ), #b
-             np.random.uniform( tc[0], tc[1]), #tc
-             np.random.uniform( m[0], m[1] ), #m
-             np.random.uniform( c1[0], c1[1] ), #c1
-             np.random.uniform( w[0], w[1]) , #w 
-             np.random.uniform( c2[0], c2[1] ), #c2
-             time_head]) #adding new parameter to fix the initial tc
+            [ np.average(self.data_series[1]) , #a
+             - (np.amax(self.data_series[1])-np.amin(self.data_series[1]) ), #b
+             time_head, #tc
+             0.5, #m
+             0.5, #c1
+             3, #w 
+             -0.5]) #c2
+        print("Initial guess: ", x0)
+        xmin = [a[0], b[0], tc[0], m[0], c1[0], w[0], c2[0]]
+        xmax = [a[1], b[1], tc[1], m[1], c1[1], w[1], c2[1]]
+
+        class MyBounds(object):
+         def __init__(self, xmin, xman ):
+             self.xmin = np.array(xmin)
+             self.xmax = np.array(xmax)
+         def __call__(self, **kwargs):
+             x = kwargs["x_new"]
+             tmax = bool(np.all(x <= self.xmax))
+             tmin = bool(np.all(x >= self.xmin))
+             return tmax and tmin
+
+        # then = time.time()
         constraints = [ { 'type': 'eq', 'fun': self.conA },
                         { 'type': 'eq', 'fun': self.conB },
                         { 'type': 'eq', 'fun': self.conC1 },
                         { 'type': 'eq', 'fun': self.conC2 },
                     ]
-        options = { 'maxiter': 500 ,'ftol': 1e-4 }
-        print(method, " Minimizing..." )
+        options = { 'maxiter': 1000 ,'ftol': 1e-4}
+        print("Minimizing..., method: ", method)
+        # methods: SLSQP, 
+        # Nelder-Mead: Simplex does not work in the below form
+        # Bounded: L-BFGS-B, TNC, SLSQP
         minimizer_kwargs = { "method": "SLSQP", "constraints": constraints ,
                              "options": options, "bounds": limits
-                           } 
+                           } #
         mytakestep = MyTakeStep()
         # mybounds = MyBounds( xmin, xmax )
         if method == 'basinhopping':
-            print("x0: [" , ", ".join( [str("{0:.3f}".format(i)) for i in x0 ]), "]"  )
             solution = basinhopping( self.objective, x0, minimizer_kwargs=minimizer_kwargs,
                         T= 1 , niter=niter, take_step = mytakestep, callback= print_fun )   
         elif method == 'SLSQP':     
             solution = minimize( self.objective ,x0 ,method='SLSQP',bounds=limits,\
                                 constraints=constraints,\
                                 options= options )
-        else: 
-            solution = \
-                differential_evolution( self.objective, bounds= bounds, 
-                    tol=1e-4, maxiter=100, popsize = 50, seed = struct.unpack("<I", os.urandom( 4 ))[0]
-                    , init='random')        
+        else: # Either basinhopping or differential evolution 
+            solution = differential_evolution( self.objective, bounds= bounds, 
+                        tol=1e-6, maxiter=100000)        
+        #print( "Minimization completed in %.2f seconds" % (time.time()-then) )
         # Now crash is a real point in time
+        crash = solution.x[2] 
+        # old crash calculation based on time index
+        #crash = (solution.x[2]- self.d.data_size)/24. 
         x = solution.x
-        crash = x[2]/365 + x[7] 
-        #print("x0: [" , ", ".join( [str("{0:.3f}".format(i)) for i in x0 ]), "]"  )
-        print( "Solution: A= %.3f, B=%.3f, Crash=%.2f days/%s, m=%.2f ,c1=%.2f ,w=%.2f ,c2=%.2f. Cost=%.5f" 
-                %(x[0], x[1], x[2], to_year_from_fraction(crash) , x[3],x[4],x[5],x[6], solution.fun))
-
-        # print( "ConA: ", str( self.conA(solution.x)) )
-        # print( "ConB: ", str( self.conB(solution.x)) )
-        # print( "ConC1: ", str( self.conC1(solution.x)) )
-        # print( "ConC2: ", str( self.conC2(solution.x)) )
-        return solution, crash, x[2]  
+        print( "x0: ", x0 )
+        print( "Solution: A= %.3f, B=%.3f, Crash=%s, m=%.2f ,c1=%.2f ,w=%.2f ,c2=%.2f. Cost=%.5f" 
+                %(x[0],x[1],to_year_from_fraction(x[2]) , x[3],x[4],x[5],x[6], solution.fun))
+        print( "ConA: ", str( self.conA(solution.x)) )
+        print( "ConB: ", str( self.conB(solution.x)) )
+        print( "ConC1: ", str( self.conC1(solution.x)) )
+        print( "ConC2: ", str( self.conC2(solution.x)) )
+        return solution, crash 
     def plot_solution (self, scale = 1, method= 'basinhopping', niter= 10):
         """
         Scale represents the number of hours 
         """
         # self.data_series = self.d.get_data_series( direction = 1, col = col, fraction= 1)
-        solution, crash_time, crash = self.solve ( method = method , niter= niter)
+        plt.plot(self.data_series[0], self.data_series[1], label='data' )
+        solution, crash = self.solve ( method = method , niter= niter)
         model_data = lpplc1( self.data_series[0], solution.x )
-        crash_time = to_year_from_fraction( crash_time).strftime( "%d/%m/%Y" )
+        crash_time = to_year_from_fraction(crash).strftime( "%d/%m/%Y" )
         label = method + " optimization - crash date: " + crash_time
+        # Old time index
+        #label = method + " optimization - crash in %.2f days" % (crash*scale) 
         plt.plot( self.data_series[0], model_data, label= label )
-        #plt.legend(loc='upper center',shadow=True, fontsize='medium')
+        plt.legend(loc='upper center',shadow=True, fontsize='medium')
         plt.xlabel("t" )
         plt.ylabel("Ln P")
         #A , #B, Tc, m, c, omega, phi
-        return crash
     def plot_cost (self, col = 'LogClose'):
         # from mpl_toolkits.mplot3d import Axes3D
         # TODO Need maint
@@ -455,7 +488,7 @@ class Nonlinear_Fit:
         from matplotlib.ticker import LinearLocator, FormatStrFormatter
 
         # self.data_series = self.get_data_series( direction = 1, col = col)
-        solution, _, _ = self.solve( )
+        solution, _ = self.solve( )
         x = solution.x
         print(solution)
         tc = x[2]
@@ -499,46 +532,15 @@ if __name__ == "__main__":
     # start date 17/9/2013
     # plt.show(block=True)
     wavelet_flag = False
-    date1, date2 = "2017-1-15 00:00:00", "2017-12-1 00:00:00"
-    #date1, date2 = "2017-1-08 00:00:00", "2017-12-1 00:00:00"
+    random.seed()
+    date1, date2 = "2017-7-08 00:00:00", "2017-12-1 00:00:00"
     #p = Pipeline(date1, date2, data_source='BTC', count=32768)
-    p = Pipeline(date1, date2, data_source='BTC', count=-8192)
+    p = Pipeline(date1, date2, data_source='BTC', count=0)
 #    p.run(level=1)
     # #l = Nonlinear_Fit("1984-07-30 00:00:00", "1987-06-12 00:00:00" , data_source= 'SP500')
     # # l = Nonlinear_Fit("1984-09-21 00:00:00", "1987-08-06 00:00:00" , data_source= 'SP500')
-    # log_file = shift_to_log( "message-%d.log" %int(time.time()) )
-    crashes = []
-    #wavelet recon
-    data_series = p.data_wrapper.get_data_series( p.data_wrapper.data , col='Recon')
-    plt.plot( data_series[0], data_series[1], label='data' )
-
-    for day in 24*np.arange(1, 76, 5): #Advance the start date and fit
-        ds = [ data_series[0][day:], data_series[1][day:] ]
-        l = Nonlinear_Fit ( ds)
-        crash = l.plot_solution( method= 'differential_evolution', niter=5 )
-        # crash = l.plot_solution( method= 'basinhopping', niter=5 )
-        crashes.append( ( crash, data_series[0][day:].size) ) 
-
-    for crash ,dt in crashes:
-        print("Crash in %.2f days, for period of %d" % (crash, dt/24))
-    
-    plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
-    plt.show()
-    # plt.close('all')
-    plt.scatter( *zip( *crashes) )
-    plt.gca().set_xlabel('tc-t2')
-    plt.gca().set_ylabel('dt = t2-t1')
-    # clusters, labels = cluster(points, 4)
-    # plt.scatter( *zip( *clusters) )
-    # plt.show(block=True)
-    # print( metrics.silhouette_score(points, labels) )
-    # print ( "Clusters: ", clusters )
-
-    # plt.title("BTC LPPL Fit - 10 Different Periods")
-    # log_file.close()
-    sys.stdout = old_stdout
-    plt.show()
-
+    l = Nonlinear_Fit (p.data_series)
+    l.plot_solution( method= 'basinhopping', niter=20 )
     # if wavelet_flag:
     #     l.wavelet_recon()
     #     l.plot_solution( method= 'basinhopping' )
@@ -547,4 +549,6 @@ if __name__ == "__main__":
     #     l.plot_solution( method= 'basinhopping' )
     #plt.plot(p.data_series[0], p.data_series[1])
     #plt.gca().xaxis.set_major_formatter(matplotlib.ticker.StrMethodFormatter("{x:.2f}"))
+    plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
+    plt.show()
 

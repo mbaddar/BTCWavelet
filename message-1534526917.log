@@ -1,0 +1,66 @@
+basinhopping  Minimizing...
+New minima 0.00833569 accepted. Solution: A= 9.249, B=-2.824, Crash=18.51 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.09 ,w=13.06 ,c2=-0.24.
+New minima 0.00814948 accepted. Solution: A= 9.235, B=-2.816, Crash=17.01 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.04 ,w=12.51 ,c2=-0.26.
+New minima 0.00818058 accepted. Solution: A= 9.242, B=-2.821, Crash=17.67 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.06 ,w=12.75 ,c2=-0.25.
+New minima 0.00867299 accepted. Solution: A= 9.256, B=-2.824, Crash=19.41 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.12 ,w=13.40 ,c2=-0.22.
+New minima 0.00814940 accepted. Solution: A= 9.236, B=-2.816, Crash=17.04 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.04 ,w=12.52 ,c2=-0.26.
+New minima 0.00852083 accepted. Solution: A= 9.207, B=-2.786, Crash=14.63 days from 2017-12-02 23:39:07, m=0.90 ,c1=0.05 ,w=11.70 ,c2=-0.26.
+New minima 0.00814940 accepted. Solution: A= 9.236, B=-2.816, Crash=17.04 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.04 ,w=12.52 ,c2=-0.26.
+New minima 0.00843660 accepted. Solution: A= 9.211, B=-2.791, Crash=14.94 days from 2017-12-02 23:39:07, m=0.90 ,c1=0.04 ,w=11.81 ,c2=-0.26.
+New minima 0.00814940 accepted. Solution: A= 9.236, B=-2.816, Crash=17.04 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.04 ,w=12.52 ,c2=-0.26.
+New minima 0.00849260 accepted. Solution: A= 9.253, B=-2.825, Crash=18.99 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.11 ,w=13.24 ,c2=-0.23.
+New minima 0.00815726 accepted. Solution: A= 9.232, B=-2.813, Crash=16.72 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.03 ,w=12.41 ,c2=-0.26.
+New minima 0.00814969 accepted. Solution: A= 9.236, B=-2.817, Crash=17.11 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.04 ,w=12.55 ,c2=-0.26.
+New minima 0.00835583 accepted. Solution: A= 9.250, B=-2.824, Crash=18.58 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.10 ,w=13.08 ,c2=-0.24.
+New minima 0.00819390 accepted. Solution: A= 9.243, B=-2.821, Crash=17.78 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.07 ,w=12.79 ,c2=-0.25.
+New minima 0.00820305 accepted. Solution: A= 9.226, B=-2.808, Crash=16.18 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.01 ,w=12.22 ,c2=-0.26.
+New minima 0.00835956 accepted. Solution: A= 9.215, B=-2.796, Crash=15.27 days from 2017-12-02 23:39:07, m=0.90 ,c1=0.03 ,w=11.92 ,c2=-0.26.
+New minima 0.00814940 accepted. Solution: A= 9.236, B=-2.816, Crash=17.04 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.04 ,w=12.52 ,c2=-0.26.
+New minima 0.00815032 accepted. Solution: A= 9.237, B=-2.817, Crash=17.15 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.05 ,w=12.56 ,c2=-0.26.
+New minima 0.00855841 accepted. Solution: A= 9.255, B=-2.825, Crash=19.16 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.12 ,w=13.31 ,c2=-0.23.
+New minima 0.00850602 accepted. Solution: A= 9.254, B=-2.825, Crash=19.03 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.11 ,w=13.25 ,c2=-0.23.
+New minima 0.00989792 accepted. Solution: A= 9.266, B=-2.816, Crash=21.13 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.16 ,w=14.13 ,c2=-0.17.
+New minima 0.00857009 accepted. Solution: A= 9.255, B=-2.825, Crash=19.18 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.12 ,w=13.32 ,c2=-0.23.
+New minima 0.00860382 accepted. Solution: A= 9.256, B=-2.825, Crash=19.26 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.12 ,w=13.35 ,c2=-0.23.
+New minima 0.00816299 accepted. Solution: A= 9.240, B=-2.819, Crash=17.46 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.06 ,w=12.67 ,c2=-0.26.
+New minima 0.00852525 accepted. Solution: A= 9.254, B=-2.825, Crash=19.07 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.11 ,w=13.27 ,c2=-0.23.
+New minima 0.00817135 accepted. Solution: A= 9.241, B=-2.820, Crash=17.57 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.06 ,w=12.71 ,c2=-0.25.
+New minima 0.00825444 accepted. Solution: A= 9.222, B=-2.803, Crash=15.81 days from 2017-12-02 23:39:07, m=0.90 ,c1=0.00 ,w=12.10 ,c2=-0.26.
+New minima 0.00823115 accepted. Solution: A= 9.223, B=-2.805, Crash=15.96 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.00 ,w=12.15 ,c2=-0.26.
+New minima 0.00829017 accepted. Solution: A= 9.219, B=-2.800, Crash=15.61 days from 2017-12-02 23:39:07, m=0.90 ,c1=0.01 ,w=12.03 ,c2=-0.26.
+New minima 0.00814940 accepted. Solution: A= 9.236, B=-2.816, Crash=17.04 days from 2017-12-02 23:39:07, m=0.90 ,c1=-0.04 ,w=12.52 ,c2=-0.26.
+x0: [ 3.617, -0.806, 23.748, 0.703, -0.499, 9.691, 0.780, 2017.921 ]
+Solution: A= 9.236, B=-2.816, Crash=17.04 days/2017-12-20 00:43:29, m=0.90 ,c1=-0.04 ,w=12.52 ,c2=-0.26. Cost=0.00815
+basinhopping  Minimizing...
+New minima 0.09205301 accepted. Solution: A= 18.731, B=-11.838, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197352 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197355 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09425837 accepted. Solution: A= 16.872, B=-9.990, Crash=30.00 days from 2017-12-02 23:39:07, m=0.12 ,c1=0.02 ,w=23.84 ,c2=-0.36.
+New minima 0.09350752 accepted. Solution: A= 17.421, B=-10.535, Crash=30.00 days from 2017-12-02 23:39:07, m=0.12 ,c1=0.02 ,w=23.85 ,c2=-0.35.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09397371 accepted. Solution: A= 17.072, B=-10.188, Crash=30.00 days from 2017-12-02 23:39:07, m=0.12 ,c1=0.02 ,w=23.84 ,c2=-0.36.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197521 accepted. Solution: A= 18.813, B=-11.920, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09207771 accepted. Solution: A= 18.705, B=-11.813, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09439060 not accepted. Solution: A= 16.783, B=-9.901, Crash=30.00 days from 2017-12-02 23:39:07, m=0.12 ,c1=0.02 ,w=23.84 ,c2=-0.36.
+New minima 0.09212161 accepted. Solution: A= 18.660, B=-11.768, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09369051 accepted. Solution: A= 17.281, B=-10.396, Crash=30.00 days from 2017-12-02 23:39:07, m=0.12 ,c1=0.02 ,w=23.85 ,c2=-0.35.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09252507 accepted. Solution: A= 18.264, B=-11.374, Crash=30.00 days from 2017-12-02 23:39:07, m=0.11 ,c1=0.02 ,w=23.85 ,c2=-0.35.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09197362 accepted. Solution: A= 18.814, B=-11.921, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34.
+New minima 0.09216785 accepted. Solution: A= 18.615, B=-11.722, Crash=30.00 days from 2017-12-02 23:39:07, m=0.10 ,c1=0.02 ,w=23.84 ,c2=-0.34.
+x0: [ 2.179, -0.894, 27.239, 0.142, 0.886, 22.253, 0.796, 2017.921 ]
+Solution: A= 18.814, B=-11.921, Crash=30.00 days/2018-01-01 23:39:07, m=0.10 ,c1=0.02 ,w=23.85 ,c2=-0.34. Cost=0.09197

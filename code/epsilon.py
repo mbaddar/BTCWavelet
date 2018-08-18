@@ -515,7 +515,7 @@ class Epsilon_Drawdown:
                 break
             #The algorithm alternates between drawup and drawdown
             drawup = not drawup 
-            i1,br = self.i1(i, epsilon, drawup= drawup) #find the peak drawup
+            i1,_ = self.i1(i, epsilon, drawup= drawup) #find the peak drawup
         
         peaks = [draws[d] for d in range( (0 if first_drawup else 1) ,len(draws),2) ]
         
