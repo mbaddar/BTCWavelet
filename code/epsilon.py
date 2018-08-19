@@ -28,6 +28,9 @@ def add_days ( from_date, days=1 ):
     new_date = datetime.strptime( from_date, date_format) + timedelta(days = days)
     return new_date
 
+def str_from_date( t , date_format = "%Y-%m-%d" ):
+    return t.strftime( date_format )
+
 def get_date_from_epoch( epoch):
     t1 = time.gmtime( epoch)
     t = datetime(t1.tm_year, t1.tm_mon, t1.tm_mday, t1.tm_hour, t1.tm_min, t1.tm_sec)
@@ -36,6 +39,11 @@ def get_date_from_epoch( epoch):
 
 def get_epoch( date_str): #change to use the sinceEpoch function
     utc_time = datetime.strptime( date_str, date_format)
+    epoch_time = (utc_time - datetime(1970, 1, 1)).total_seconds()
+    return int( np.round( epoch_time))
+
+def get_epoch2( date_str ): #change to use the sinceEpoch function
+    utc_time = datetime.strptime( date_str, "%b %d, %Y")
     epoch_time = (utc_time - datetime(1970, 1, 1)).total_seconds()
     return int( np.round( epoch_time))
 
@@ -106,10 +114,12 @@ class Data_Wrapper:
         # Turn into dictoinary
         elif data_source == 'SSE':
             self.get_SSE_data()
-        elif data_source == 'SP500':
+        elif data_source == 'SP500': #bad branching. To compact
             self.get_Historical_data( path = 'sp5001987.csv')
         elif data_source == 'DIJA':
             self.get_Historical_data( path = 'dija1929.csv')
+        elif data_source == 'OMXS30':
+            self.get_omx_data( path = 'OMXS30.csv', sep=';')
         else:
             print("Invalid data source") #TODO raise error 
 
@@ -131,12 +141,35 @@ class Data_Wrapper:
         self.data_size = df['LogClose'].size
         return df 
     #Need to refactor and generalize
-    def get_Historical_data(self, path = 'sp5001987.csv'):
+    def get_omx_data(self, path = 'sp5001987.csv', sep=','):
         path = 'Data\\EWS-QR-LPPL-data-master\\' + path
         df = None
         try:
             #names=[ "Date", "Price", "Open", "High", "Low", "Vol", "Change" ]
-            df = pd.read_csv( path , sep=',', names=['Date', 'Close'], parse_dates=['Date'], index_col='Date', 
+            df = pd.read_csv( path , sep= sep, 
+                names=['Date', 'High', 'Low', 'Close', 'Average', 'Total', 'Turnover', 'Trades'], 
+                parse_dates=['Date'], index_col='Date', usecols = ['Date', 'Close'],
+                header= 0).reset_index()  
+            df.columns = ['Date', 'Close']
+            df['Close'] = df['Close'].apply(lambda x: float( x.replace(',','') ) )
+            # df['LogClose'] = df['Close']
+            df['LogClose'] = df['Close'].apply( lambda x: np.log(x))
+            # df['StrDate'] = df['Date']
+            df['Date'] = df['Date'].apply( lambda date: int(np.round((date - datetime(1970, 1, 1)).total_seconds()) ))
+            df.index = reversed(df.index)
+            df = df.sort_index()
+        except BaseException as e:
+            print( e )
+        self.data = df
+        self.data_size = df['LogClose'].size
+        return df 
+
+    def get_Historical_data(self, path = 'sp5001987.csv', sep=','):
+        path = 'Data\\EWS-QR-LPPL-data-master\\' + path
+        df = None
+        try:
+            #names=[ "Date", "Price", "Open", "High", "Low", "Vol", "Change" ]
+            df = pd.read_csv( path , sep= sep, names=['Date', 'Close'], parse_dates=['Date'], index_col='Date', 
                                     header= 0).reset_index()  
             df.columns = ['Date', 'Close']
             df['LogClose'] = df['Close'].apply( lambda x: np.log(x))
@@ -148,39 +181,37 @@ class Data_Wrapper:
         self.data = df
         self.data_size = df['LogClose'].size
         return df 
+
     def get_lppl_data(self, date_from = '2015-09-01 00:00:00', date_to = '2015-10-24 00:00:00', force_read = False ):
         # BTC
-        daily_data = self.lppl_data
+        # daily_data = self.lppl_data
         #read once 
-        if not self.lppl_data or force_read:
-            print("Reading data from csv") 
-            daily_data = pd.read_csv( "Data/cmc/daily.csv", sep='\t', parse_dates=['Date'], index_col='Date', 
-                                    names=[ 'Date', 'Open', 'High', 'Low', 'PirceClose', 'Volume', 'MarketCap'],
-                                    header=0)  
-            #data preprocessing. remove the , mark 
-            daily_data['Open'] = daily_data['Open'].apply(lambda x: float( x.replace(',','') ) )
-            daily_data['High'] = daily_data['High'].apply(lambda x: float( x.replace(',','') ) )
-            daily_data['Low'] = daily_data['Low'].apply(lambda x: float( x.replace(',','') ) )
-            daily_data['PirceClose'] = daily_data['PirceClose'].\
-                    apply(lambda x: float( x.replace(',','') ) )
-            # Lppl works on log prices
-            daily_data['Close'] = daily_data['PirceClose'].apply( lambda x: np.log(x) )
-            self.lppl_data = daily_data 
+        # if not self.lppl_data or force_read:
+        print("Reading data from csv") 
+        daily_data = pd.read_csv( "Data/cmc/daily.csv", sep='\t',
+                                names=[ 'Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'MarketCap'],
+                                header=0)
+        #data preprocessing. remove the , mark 
+        daily_data['Open'] = daily_data['Open'].apply(lambda x: float( x.replace(',','') ) )
+        daily_data['High'] = daily_data['High'].apply(lambda x: float( x.replace(',','') ) )
+        daily_data['Low'] = daily_data['Low'].apply(lambda x: float( x.replace(',','') ) )
+        daily_data['Close'] = daily_data['Close'].\
+                apply(lambda x: float( x.replace(',','') ) )
+        # Lppl works on log prices
+        daily_data['LogClose'] = daily_data['Close'].apply( lambda x: np.log(x) )
+        daily_data['Date'] = daily_data['Date'].apply( lambda x: get_epoch2( x) )
+        # self.lppl_data = daily_data 
+        daily_data['StrDate'] = daily_data['Date'].apply( lambda epoch: get_date_from_epoch( epoch) )
         #Filter
-        daily_data = daily_data.loc[daily_data.index >= date_from] #Min
-        daily_data = daily_data.loc[daily_data.index <= date_to] #Max
-        #reverse index
-        # daily_data.index = reversed(daily_data.index)
-        # daily_data= daily_data.sort_index()
+        # daily_data = daily_data.loc[daily_data.index >= date_from] #Min
+        # daily_data = daily_data.loc[daily_data.index <= date_to] #Max
+        # reverse index
+        daily_data.index = reversed(daily_data.index)
+        daily_data= daily_data.sort_index()
         #date = daily_data.index
-        time = np.linspace( 0, len(daily_data)-1, len(daily_data)) #just a sequence 
-        # Reversed data 
-        close = [daily_data.Close[-i] for i in range(1,len(daily_data.Close)+1)]
-        dataSeries = [time, close]
-
         self.data = daily_data
-        self.data_size = dataSeries[0].size
-        return dataSeries
+        self.data_size = daily_data.LogClose.size
+        return daily_data
     def get_data_series( self, data, direction = 1, col = 'LogClose', fraction = 1):
         """
         Direction: +/- 1
@@ -215,7 +246,7 @@ class Data_Wrapper:
         hourly_data.columns = ['Date', 'Close', 'LogClose']
         hourly_data['StrDate'] = hourly_data['Date'].apply( lambda epoch: get_date_from_epoch( epoch) )
         self.data = hourly_data
-        self.__data_size = hourly_data.LogClose.size 
+        self.data_size = hourly_data.LogClose.size 
         return hourly_data
     def trim_by_date(self, date_from, date_to):
         """
@@ -271,7 +302,7 @@ class Data_Wrapper:
         #df.index = reversed(df.index)
         return df
     def get_data(self, path= "Data/cmc/daily.csv"):
-        daily_data = pd.read_csv( path, sep='\t', parse_dates=['Date'], index_col= 'Date', 
+        daily_data = pd.read_csv( path, sep='\t', parse_dates=['Date'], index_col= 'Date',
                                     names=[ 'Date', 'Open', 'High', 'Low', 'PirceClose', 'Volume', 'MarketCap'],
                                     header=0)
 
