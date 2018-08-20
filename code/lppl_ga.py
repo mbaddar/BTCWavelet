@@ -32,6 +32,9 @@ def shift_to_log(file = "message.log" ):
     sys.stdout = log_file
     return log_file
 
+def next_power_of_2(x):  
+    return 1 if x == 0 else 2**(x - 1).bit_length()
+
 
 class Pipeline:
     @property
@@ -429,9 +432,6 @@ class Nonlinear_Fit:
         """
         Returns: Solution, crash date, tc in no. of days
         """
-        rnd = struct.unpack("<I", os.urandom( 4 ))[0]
-        np.random.seed( rnd )
-
         def print_fun(x, f, accepted):
             print("New minima %.8f %s. Solution: Crash=%.2f days from %s, m=%.2f ,w=%.2f ." 
                 %(f, "accepted" if accepted else "not accepted" ,
@@ -441,27 +441,32 @@ class Nonlinear_Fit:
         time_head = self.data_series[0][data_size-1]+day_fraction 
         tc = (0, 100 ) #look 3 months in advance
         m = (0.1, 0.9)
-        w = (3,25)
+        w = (3,13)
         
         class MyTakeStep(object):
             def __init__(self, stepsize=0.5): #0.5 for hourly
                 self.stepsize = stepsize
             def __call__(self, x):
                 #s = self.stepsize
-                x[0] += np.random.uniform( -10, 10) #tc
-                x[1] += np.random.uniform( -.8, .8) #m
-                x[2] += np.random.uniform( -22, 22 ) #w
+                # randoms = np.random.random_sample((3,))
+                x[0] += 20.*randoms[0] -10 # (-10, 10) #tc
+                x[1] += 1.6*randoms[1] -.8  #(-.8, .8) #m
+                x[2] += 22.*randoms[2] -11 #(-11, 11 ) #w
+                # x[0] += np.random.uniform(-10,10)
+                # x[1] += np.random.uniform(-.8,.8)
+                # x[2] += np.random.uniform(-11,11) 
                 return x    
 
         limits = ( tc, m, w, (time_head,time_head) )
         bounds = list(limits) 
+        randoms = np.random.random_sample((3,))
         x0 = np.array( 
             [ 
-             np.random.uniform(0,100 ), #tc
-             np.random.uniform( m[0], m[1] ), #m
-             np.random.uniform( w[0], w[1]) , #w 
+            0, #100.*randoms[0],  #tc
+            (m[1] - m[0]) * randoms[1] + m[0],  
+            (w[1]-w[0]) * randoms[2] +w[0],  #(22, 22 ) #w
              time_head] ) 
-        options = { 'maxiter': 10000 ,'ftol': 1e-8 }
+        options = { 'maxiter': 1000 ,'ftol': 1e-4 }
         minimizer_kwargs = { "method": "SLSQP",
                              "options": options, "bounds": limits
                            } 
@@ -480,8 +485,14 @@ class Nonlinear_Fit:
         crash = x[0]/365 + x[3] 
         lp = self.linear_constraint2(x) #[a,b,c1,c2]
         #print("x0: [" , ", ".join( [str("{0:.3f}".format(i)) for i in x0 ]), "]"  )
-        print( "Solution: A= %.3f, B=%.3f, ,c1=%.2f, c2=%.2f ,Crash=%.2f days/%s, m=%.2f  ,w=%.2f. Cost=%.5f" 
-                %(lp[0], lp[1], lp[2], lp[3], x[0], to_year_from_fraction(crash) , x[1],x[2], solution.fun))
+        print( "Solution: A= %.3f, B=%.3f, ,c1=%.3f, c2=%.3f ,Crash=%.2f days/%s, m=%.3f  ,w=%.3f. Cost=%.4f" 
+                %(  
+                lp[0], lp[1], lp[2], lp[3], x[0], to_year_from_fraction(crash) ,
+                x[1],x[2], solution.fun))
+        # print( "%s Solution: A= %.3f, B=%.3f, ,c1=%.2f, c2=%.2f ,Crash=%.2f days/%s, m=%.2f  ,w=%.2f. Cost=%.5f" 
+        #         %( "Successful" if solution.success else "Unsuccessful", 
+        #         lp[0], lp[1], lp[2], lp[3], x[0], to_year_from_fraction(crash) ,
+        #         x[1],x[2], solution.fun))
         return solution, crash, x[0] 
 
     def solve (self, method = 'basinhopping', niter = 10 ):
@@ -583,14 +594,13 @@ class Nonlinear_Fit:
         plt.ylabel("Ln P")
         #A , #B, Tc, m, c, omega, phi
         return crash
-
     def plot_solution2 (self, scale = 1, method= 'basinhopping', niter= 10 ):
         """
         Scale represents the number of hours 
         """
         # self.data_series = self.d.get_data_series( direction = 1, col = col, fraction= 1)
         solution, crash_time, crash = self.solve2 ( method = method , niter= niter)
-        model_data = self.reduced_lppl( self.data_series[0], solution.x )
+        #model_data = self.reduced_lppl( self.data_series[0], solution.x )
         # label = method + " optimization - crash date: " + to_year_from_fraction( crash_time).strftime( "%d/%m/%Y" )
         # plt.plot( self.data_series[0], model_data ,label="LPPL Fit", color="blue") #, label= label
         #plt.legend(loc='upper center',shadow=True, fontsize='medium')
@@ -649,8 +659,8 @@ def describe( data):
     print(df.describe())
 
 
-def omx30():
-    date1, date2 = "1996-4-20 00:00:00", "1998-8-15 00:00:00"
+def omxs30():
+    date1, date2 = "1996-5-20 00:00:00", "1998-8-18 00:00:00"
     p = Pipeline( date1, date2, data_source='OMXS30', hourly=False, count=0)
     data_series = p.data_series
     # plt.plot( data_series[0], data_series[1], label='Data' )
@@ -659,21 +669,21 @@ def omx30():
     # plt.title("OMX3 Crash")
     print("Actual crash: ", to_year_from_fraction(1998.686) )
     crashes = []
-    # dt = []
-    for _ in np.arange(5):
-        for day in np.arange(1, 60): #Advance the start date and fit
+    dt = []
+    for _ in np.arange(1):
+        for day in np.arange(1, 30): #Advance the start date and fit
             ds = [ data_series[0][day:], data_series[1][day:] ]
             l = Nonlinear_Fit ( ds)
-            # crash = l.plot_solution( method= 'differential_evolution', niter=5 )
-            crash = l.plot_solution2( method= 'basinhopping', niter=20 )
+            #crash = l.plot_solution( method= 'differential_evolution', niter=5 )
+            crash = l.plot_solution2( method= 'basinhopping', niter=30 )
             crashes.append( crash)
-            # dt.append( data_series[0][day:].size )  
+            dt.append( data_series[0][day:].size )  
 
-    # for crash ,dt in crashes:
-        # print("Crash time %s, for period of %d" % (to_year_from_fraction( crash), dt))
-    
-    # plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
-    # plt.show()
+    scatter_plot(crashes, dt)
+    plt.title("Crash times Cluster. Actual crash on %s" % str_from_date( to_year_from_fraction(1998.686) ) )
+    plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
+    plt.show()
+
     # plt.close('all')
     describe( crashes )
     hist( crashes )
@@ -683,28 +693,29 @@ def omx30():
 def hist( data):
     plt.hist( data )
 
-def scatter_plot(crashes):
+def scatter_plot(crashes, dt):
     """
     List of tuples
     """
-    plt.scatter( *zip( *crashes) )
+    # plt.scatter( *zip( *crashes) )
+    plt.scatter( crashes, dt )
     plt.gca().set_xlabel('tc')
     plt.gca().set_ylabel('dt = t2-t1')
-    plt.title("Crash times Cluster. Actual crash on %s" % str_from_date( to_year_from_fraction(1998.686) ) )
     plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
 
-def synthetic_stats( trials=1000):
+def synthetic_stats( trials=100):
     x = [ 569.988, -266.943, 1980.218, 0.445 , 8.186642647	,7.877 ,-11.65390262]
-    t = np.linspace(1977.5, 1980, 1000)
-    v = lpplc1tc(t, x) + np.random.normal(0, 10, t.shape)
 
-    data_series = [t, v]
-
-    l = Nonlinear_Fit ( data_series)
     crashes = np.zeros( trials)
     for i in np.arange( trials):
-        crashes[i] = l.plot_solution2( method= 'basinhopping', niter=10)
+        t = np.linspace(1977.5+0.5*np.random.random_sample(), 1980, 1000)
+        v = lpplc1tc(t, x) + np.random.normal(0, 10, t.shape)
+        data_series = [t, v]
+        l = Nonlinear_Fit ( data_series)
+        crashes[i] = l.plot_solution2( method= 'basinhopping', niter=20)
     df = DataFrame( crashes, columns = ['Crash time'])
+    hist( crashes )
+    plt.show()
     print(df.describe())
 
 def synthetic_trial():
@@ -740,30 +751,41 @@ def synthetic_trial():
     # plt.show()
     # 
 
-def Btc_trial_daily():
-    date1, date2 = "2017-5-1 00:00:00", "2017-11-15 00:00:00"
-    p = Pipeline( date1, date2, data_source='BTC', hourly=False, count=0)
+def Btc_trial(  date1 = "2017-5-1 00:00:00", date2 = "2017-11-15 00:00:00", hourly = True, wavelet = False, trials = 1000 , level=1 ):
+    count = 0
+    p = Pipeline( date1, date2, data_source='BTC', hourly= hourly, count= count)
+    original_size = p.data_series[0].size
+    print( "Original size: ", original_size )
     data_series = p.data_series
-    # plt.plot( data_series[0], data_series[1], label='Data' )
-    # plt.xlabel("t")
-    # plt.ylabel("Ln P")
-    # plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
+    plt.plot(data_series[0], data_series[1])
+
+    #If wavelet flag set. get wavelet level 1 dataseries. 
+    if wavelet:
+        count = - next_power_of_2( original_size ) # -8192 # power of 2 count. Needed data is only 6912 hours
+        p = Pipeline( date1, date2, data_source='BTC', hourly= hourly, count = count)
+        if level>1:
+            p.wavelet_recon(level= level ) #applies wavelet reconstruction and stores overwrites the recon column
+
+        data_series = p.data_wrapper.get_data_series( col='Recon')
+        data_series = [ data_series[0][-original_size:], data_series[1][-original_size:]  ]
+
+    print("wavelet size: ", count)
+
+    plt.plot(data_series[0], data_series[1])
+    plt.show()
+
     crashes = []
-    # plt.show()
+    day = 24 if hourly else 1
+    for _ in np.arange( trials ): 
+        day_from = np.random.randint(0,60*day) # trim random days from the start
+        day_to = np.random.randint(1,10*day) #trim random days from the end. At least 1
+        ds = [ data_series[0][ day_from:-day_to ], data_series[1][ day_from:-day_to ] ]
+        l = Nonlinear_Fit ( ds)
+        # crash = l.plot_solution( method= 'differential_evolution', niter=5 )
+        crash = l.plot_solution2( method= 'basinhopping', niter=20 )
+        crashes.append( ( crash, data_series[0][day_from:-day_to].size) ) 
 
-    for _ in np.arange(1, 5): #Advance the start date and fit
-        for day in np.arange(1, 20): #Advance the start date and fit
-            ds = [ data_series[0][day:], data_series[1][day:] ]
-            l = Nonlinear_Fit ( ds)
-            # crash = l.plot_solution( method= 'differential_evolution', niter=5 )
-            crash = l.plot_solution2( method= 'basinhopping', niter=30 )
-            crashes.append( ( crash, data_series[0][day:].size) ) 
-
-    # for crash ,dt in crashes:
-    #     print("Crash time %s, for period of %d" % (to_year_from_fraction( crash), dt))
     describe( crashes)
-    plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
-    # plt.close('all')
     plt.scatter( *zip( *crashes) )
     plt.gca().set_xlabel('tc')
     plt.gca().set_ylabel('dt = t2-t1')
@@ -772,9 +794,16 @@ def Btc_trial_daily():
     plt.show()
 
 if __name__ == "__main__":
-    #Btc_trial_daily()
     #synthetic_trial()
-    synthetic_stats( 100)
+    # synthetic_stats( 100)
+    rnd = struct.unpack("<I", os.urandom( 4 ))[0]
+    np.random.seed( rnd )
+    rnd = struct.unpack("<I", os.urandom( 4 ))[0]
+    random.seed( rnd )
+    date1, date2 = "2017-2-1 00:00:00", "2017-11-15 00:00:00"
+
+    Btc_trial( date1, date2 ,hourly = True , wavelet= True, trials = 1000, level=1 )
+    #omxs30()
 
 if __name__ == "__main__1":
     # start date 17/9/2013

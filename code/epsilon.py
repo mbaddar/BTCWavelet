@@ -76,13 +76,13 @@ class Data_Wrapper:
     from: 17/09/2013 9 am
     to: 06/07/2018 4 pm
     """
-    @property
-    def lppl_data(self):
-        return self.__lppl_data
+    # @property
+    # def lppl_data(self):
+    #     return self.__lppl_data
 
-    @lppl_data.setter
-    def lppl_data(self, lppl_data):
-        self.__lppl_data = lppl_data
+    # @lppl_data.setter
+    # def lppl_data(self, lppl_data):
+    #     self.__lppl_data = lppl_data
 
     @property
     def data(self):
@@ -104,7 +104,7 @@ class Data_Wrapper:
         Support multiple data sources
         data_source: one of: 'BTC', 'SP500'
         """
-        self.lppl_data = None 
+        # self.lppl_data = None 
         self.data = None
         if data_source == 'BTC':
             if hourly:
@@ -187,7 +187,6 @@ class Data_Wrapper:
         # daily_data = self.lppl_data
         #read once 
         # if not self.lppl_data or force_read:
-        print("Reading data from csv") 
         daily_data = pd.read_csv( "Data/cmc/daily.csv", sep='\t',
                                 names=[ 'Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'MarketCap'],
                                 header=0)
@@ -207,17 +206,18 @@ class Data_Wrapper:
         # daily_data = daily_data.loc[daily_data.index <= date_to] #Max
         # reverse index
         daily_data.index = reversed(daily_data.index)
-        daily_data= daily_data.sort_index()
-        #date = daily_data.index
+        daily_data = daily_data.sort_index()
         self.data = daily_data
         self.data_size = daily_data.LogClose.size
         return daily_data
-    def get_data_series( self, data, direction = 1, col = 'LogClose', fraction = 1):
+    def get_data_series( self, data = None, direction = 1, col = 'LogClose', fraction = 1):
         """
         Direction: +/- 1
         fraction is a flag. if set to 0 (default): dataSeries[0] is time points indexed from 0
         if set to 1: return fractional year. Example: 2018.604060 for 9/8/2018
         """
+        if data is None or data.empty:
+            data = self.data
         if direction not in [-1,1]:
             direction = 1 #Should raise some error 
         # Remove na first 
