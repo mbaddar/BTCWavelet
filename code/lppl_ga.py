@@ -757,7 +757,7 @@ def Btc_trial(  date1 = "2017-5-1 00:00:00", date2 = "2017-11-15 00:00:00", hour
     original_size = p.data_series[0].size
     print( "Original size: ", original_size )
     data_series = p.data_series
-    plt.plot(data_series[0], data_series[1])
+    # plt.plot(data_series[0], data_series[1])
 
     #If wavelet flag set. get wavelet level 1 dataseries. 
     if wavelet:
@@ -785,7 +785,7 @@ def Btc_trial(  date1 = "2017-5-1 00:00:00", date2 = "2017-11-15 00:00:00", hour
         crash = l.plot_solution2( method= 'basinhopping', niter=20, omega = omega )
         crashes.append( ( crash, data_series[0][day_from:-day_to].size) ) 
 
-    describe( crashes)
+    describe( crashes )
     plt.scatter( *zip( *crashes) )
     plt.gca().set_xlabel('tc')
     plt.gca().set_ylabel('dt = t2-t1')
@@ -800,7 +800,7 @@ if __name__ == "__main__":
     np.random.seed( rnd )
     rnd = struct.unpack("<I", os.urandom( 4 ))[0]
     random.seed( rnd )
-    date1, date2 = "2016-2-1 00:00:00", "2017-11-15 00:00:00"
+    date1, date2 = "2016-2-1 00:00:00", "2017-11-25 00:00:00"
 
     Btc_trial( date1, date2 ,hourly = False , wavelet= False, trials = 100, level=1, omega= 8 )
     #omxs30()
