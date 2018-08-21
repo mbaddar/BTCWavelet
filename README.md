@@ -9,13 +9,14 @@
 
 ### Content:
 [1. Creating Anaconda Environment:](#1) 
+
 [2. Running the code:](#2) 
 
 
 ### 1. Running the code: <a  id="1"></a> 
 
 The easiest way to replicate the Python environment needed to run this code is to use the file conda-spec.txt to create an identical local conda environment by invoking the following command from the repository directory:
-```conda create --name tensorflow --file conda-spec.txt 
+```conda create --name tensorflow --file conda-spec.txt ```
 
 ### 2. Running the code: <a  id="2"></a>  
 
