@@ -19,7 +19,7 @@ The easiest way to replicate the Python environment needed to run this code is t
 
 ```conda create --name tensorflow --file conda-spec.txt ```
 
-For more information on how conda environments work refer to (https://conda.io/docs/user-guide/tasks/manage-environments.html#building-identical-conda-environments)[https://conda.io/docs/user-guide/tasks/manage-environments.html#building-identical-conda-environments] 
+For more information on how conda environments work refer to [Conda user guide: Building Identical Conda Environments](https://conda.io/docs/user-guide/tasks/manage-environments.html#building-identical-conda-environments) 
 
 ### 2. Running the code: <a  id="2"></a>  
 
