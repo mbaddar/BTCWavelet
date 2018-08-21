@@ -428,7 +428,7 @@ class Nonlinear_Fit:
         obj = self.sse(y, yest) 
         return obj
 
-    def solve2 (self, method = 'basinhopping', niter = 10 ):
+    def solve2 (self, method = 'basinhopping', niter = 10, omega = 13 ):
         """
         Returns: Solution, crash date, tc in no. of days
         """
@@ -441,8 +441,7 @@ class Nonlinear_Fit:
         time_head = self.data_series[0][data_size-1]+day_fraction 
         tc = (0, 100 ) #look 3 months in advance
         m = (0.1, 0.9)
-        w = (3,13)
-        
+        w = (3, omega) #experimental: pass the upper limit 
         class MyTakeStep(object):
             def __init__(self, stepsize=0.5): #0.5 for hourly
                 self.stepsize = stepsize
@@ -594,12 +593,12 @@ class Nonlinear_Fit:
         plt.ylabel("Ln P")
         #A , #B, Tc, m, c, omega, phi
         return crash
-    def plot_solution2 (self, scale = 1, method= 'basinhopping', niter= 10 ):
+    def plot_solution2 (self, scale = 1, method= 'basinhopping', niter= 10, omega=13 ):
         """
         Scale represents the number of hours 
         """
         # self.data_series = self.d.get_data_series( direction = 1, col = col, fraction= 1)
-        solution, crash_time, crash = self.solve2 ( method = method , niter= niter)
+        solution, crash_time, crash = self.solve2 ( method = method , niter= niter, omega=omega)
         #model_data = self.reduced_lppl( self.data_series[0], solution.x )
         # label = method + " optimization - crash date: " + to_year_from_fraction( crash_time).strftime( "%d/%m/%Y" )
         # plt.plot( self.data_series[0], model_data ,label="LPPL Fit", color="blue") #, label= label
@@ -751,7 +750,8 @@ def synthetic_trial():
     # plt.show()
     # 
 
-def Btc_trial(  date1 = "2017-5-1 00:00:00", date2 = "2017-11-15 00:00:00", hourly = True, wavelet = False, trials = 1000 , level=1 ):
+def Btc_trial(  date1 = "2017-5-1 00:00:00", date2 = "2017-11-15 00:00:00", hourly = True, 
+    wavelet = False, trials = 1000 , level=1, omega = 13 ):
     count = 0
     p = Pipeline( date1, date2, data_source='BTC', hourly= hourly, count= count)
     original_size = p.data_series[0].size
@@ -771,8 +771,8 @@ def Btc_trial(  date1 = "2017-5-1 00:00:00", date2 = "2017-11-15 00:00:00", hour
 
     print("wavelet size: ", count)
 
-    plt.plot(data_series[0], data_series[1])
-    plt.show()
+    # plt.plot(data_series[0], data_series[1])
+    # plt.show()
 
     crashes = []
     day = 24 if hourly else 1
@@ -782,7 +782,7 @@ def Btc_trial(  date1 = "2017-5-1 00:00:00", date2 = "2017-11-15 00:00:00", hour
         ds = [ data_series[0][ day_from:-day_to ], data_series[1][ day_from:-day_to ] ]
         l = Nonlinear_Fit ( ds)
         # crash = l.plot_solution( method= 'differential_evolution', niter=5 )
-        crash = l.plot_solution2( method= 'basinhopping', niter=20 )
+        crash = l.plot_solution2( method= 'basinhopping', niter=20, omega = omega )
         crashes.append( ( crash, data_series[0][day_from:-day_to].size) ) 
 
     describe( crashes)
@@ -800,9 +800,9 @@ if __name__ == "__main__":
     np.random.seed( rnd )
     rnd = struct.unpack("<I", os.urandom( 4 ))[0]
     random.seed( rnd )
-    date1, date2 = "2017-2-1 00:00:00", "2017-11-15 00:00:00"
+    date1, date2 = "2016-2-1 00:00:00", "2017-11-15 00:00:00"
 
-    Btc_trial( date1, date2 ,hourly = True , wavelet= True, trials = 1000, level=1 )
+    Btc_trial( date1, date2 ,hourly = False , wavelet= False, trials = 100, level=1, omega= 8 )
     #omxs30()
 
 if __name__ == "__main__1":
@@ -821,7 +821,7 @@ if __name__ == "__main__1":
     data_series = p.data_series
     plt.plot( data_series[0], data_series[1], label='Data' )
     l = Nonlinear_Fit ( data_series)
-    l.plot_solution2( method= 'basinhopping', niter=30)
+    l.plot_solution2( method= 'basinhopping', niter=20)
     plt.xlabel("t")
     plt.ylabel("Ln P")
     plt.title("Reduced Solution")
