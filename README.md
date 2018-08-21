@@ -9,14 +9,18 @@
 
 ### Content:
 [1. Creating Anaconda Environment:](#1) 
+
 [2. Running the code:](#2) 
 
 
-### 1. Running the code: <a  id="1"></a> 
+### 1. Creating Anaconda Environment: <a  id="1"></a> 
 
 The easiest way to replicate the Python environment needed to run this code is to use the file conda-spec.txt to create an identical local conda environment by invoking the following command from the repository directory:
-```conda create --name tensorflow --file conda-spec.txt 
+
+```conda create --name tensorflow --file conda-spec.txt ```
+
+For more information on how conda environments work refer to [Conda user guide: Building Identical Conda Environments](https://conda.io/docs/user-guide/tasks/manage-environments.html#building-identical-conda-environments) 
 
 ### 2. Running the code: <a  id="2"></a>  
 
-
+All the experiments starting points are in [lppl_ga.py](../master/code/lppl_ga.py). The code will default to run a 1000 Bitcoin trials on hourly data with DWT enabled. I might create a command-line interface for the different experiments in the future. 
