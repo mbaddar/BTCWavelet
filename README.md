@@ -23,4 +23,4 @@ For more information on how conda environments work refer to [Conda user guide: 
 
 ### 2. Running the code: <a  id="2"></a>  
 
-All the experiments starting points are in [lppl_ga.py](../blob/master/code/lppl_ga.py). The code will default to run a 1000 Bitcoin trials on hourly data with DWT enabled. I might create a command-line interface for the different experiments in the future. 
+All the experiments starting points are in [lppl_ga.py](../master/code/lppl_ga.py). The code will default to run a 1000 Bitcoin trials on hourly data with DWT enabled. I might create a command-line interface for the different experiments in the future. 
