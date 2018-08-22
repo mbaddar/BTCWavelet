@@ -12,7 +12,10 @@
 
 [2. Running the code:](#2) 
 
-[3. Code Files:](#2)
+[3. Code Files:](#3)
+
+[3. Classes Description:](#3)
+
 
 ### 1. Creating Anaconda Environment: <a  id="1"></a> 
 
@@ -33,4 +36,16 @@ All the experiments starting points are in [lppl_ga.py](../master/code/lppl_ga.p
 |Lppl_ga.py|Pipeline, Nonlinear_Fit|
 |Epsilon.py|Data_Wrapper, Epsilon_Drawdown|
 |Decomposition.py|Wavelet_Wrapper|
-|Crawler.py|BaseCrawler, Crawler, … [exchange specific crawlers were not used]|
+|Crawler.py|BaseCrawler, Crawler, … exchange specific crawlers were not used|
+
+### 4. Classes Description: <a  id="4"></a>
+|Class name|Description|
+|---|---|
+| BaseCrawler  |  Basic http, requesting API endpoint functions |
+|Crawler | Cryptocompare crawler. The Bitcoin hourly data source.  |
+| Data_Wrapper  | Reads local Bitcoin and other financial assets data and returns them on a
+dataframe with a standard column formatting  |
+|  Epsilon_Drawdown  | Implementation of (Gerlach, et al., 2018) Epsilon Drwadown algorithm  |
+| Nonlinear_Fit   | Implementation of LPPL non-linear optimization. The main algorithm used across experiments is Basin Hopping.|
+| Pipeline   | The model pipeline from crawling to bubble prediction. Incomplete  |
+| Wavelet_Wrapper   |  Implementation of DWT reconstruction using PyWavelets6 library |
