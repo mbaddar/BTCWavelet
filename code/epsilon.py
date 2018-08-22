@@ -154,6 +154,7 @@ class Data_Wrapper:
             df['Close'] = df['Close'].apply(lambda x: float( x.replace(',','') ) )
             # df['LogClose'] = df['Close']
             df['LogClose'] = df['Close'].apply( lambda x: np.log(x))
+            # df['LogClose'] = df['Close'].apply( lambda x: x/1000)
             # df['StrDate'] = df['Date']
             df['Date'] = df['Date'].apply( lambda date: int(np.round((date - datetime(1970, 1, 1)).total_seconds()) ))
             df.index = reversed(df.index)

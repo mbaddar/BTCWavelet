@@ -1,5 +1,83 @@
 #lppl_ga.py
 # Junk Code 
+
+if __name__ == "__main__1":
+    # start date 17/9/2013
+    # plt.show(block=True)
+    wavelet_flag = False
+    date1, date2 = "2017-1-15 00:00:00", "2017-12-1 00:00:00"
+    #p = Pipeline(date1, date2, data_source='BTC', count=32768)
+    # p = Pipeline(date1, date2, data_source='BTC', hourly=False, count=-16384)
+    p = Pipeline( date1, date2, data_source='BTC', hourly=False, count=0)
+    p.run(level=1)
+    # log_file = shift_to_log( "message-%d.log" %int(time.time()) )
+    crashes = []
+    #wavelet recon
+    # data_series = p.data_wrapper.get_data_series( p.data_wrapper.data , col='Recon')
+    data_series = p.data_series
+    plt.plot( data_series[0], data_series[1], label='Data' )
+    l = Nonlinear_Fit ( data_series)
+    l.plot_solution2( method= 'basinhopping', niter=20)
+    plt.xlabel("t")
+    plt.ylabel("Ln P")
+    plt.title("Reduced Solution")
+    plt.show()
+    # x = solution.x
+    #A= 9.554, B=-2.931, Crash=29.42 m=0.75 ,c1=0.16 ,w=12.74 ,c2=-0.20.
+        
+    # plt.plot( data_series[0], data_series[1], label='Tc=29 days' )
+    # x= [ 9.554, -2.931, 9.42 ,0.75 ,0.16 ,12.74 ,-0.20, data_series[0][data_series[0].size-1] ]
+    # data_series[1] = lpplc1(data_series[0], x)
+    # plt.plot( data_series[0], data_series[1], label='Tc=9 days' )
+    # x= [ 9.554, -2.931, 59.42 ,0.75 ,0.16 ,12.74 ,-0.20, data_series[0][data_series[0].size-1] ]
+    # data_series[1] = lpplc1(data_series[0], x)
+    # plt.plot( data_series[0], data_series[1], label='Tc=59 days' )
+    # plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
+    # plt.xlabel("t")
+    # plt.ylabel("Ln P")
+    # plt.title("LPPL fit of differenet Tc")
+    # plt.legend()
+    # plt.show()
+    # for day in 24*np.arange(1, 76, 5): #Advance the start date and fit
+    # for day in np.arange(1, 20): #Advance the start date and fit
+    #     ds = [ data_series[0][day:], data_series[1][day:] ]
+    #     l = Nonlinear_Fit ( ds)
+    #     # crash = l.plot_solution( method= 'differential_evolution', niter=5 )
+    #     crash = l.plot_solution( method= 'basinhopping', niter=30 )
+    #     crashes.append( ( crash, data_series[0][day:].size) ) 
+
+    # for crash ,dt in crashes:
+    #     print("Crash in %.2f days, for period of %d" % (crash, dt))
+    
+    # plt.show()
+    # # plt.close('all')
+    # plt.scatter( *zip( *crashes) )
+    # plt.gca().set_xlabel('tc-t2')
+    # plt.gca().set_ylabel('dt = t2-t1')
+
+    # clusters, labels = cluster(points, 4)
+    # plt.scatter( *zip( *clusters) )
+    # plt.show(block=True)
+    # print( metrics.silhouette_score(points, labels) )
+    # print ( "Clusters: ", clusters )
+
+    # plt.title("BTC LPPL Fit - 10 Different Periods")
+    # log_file.close()
+    sys.stdout = old_stdout
+    # plt.show()
+
+    # if wavelet_flag:
+    #     l.wavelet_recon()
+    #     l.plot_solution( method= 'basinhopping' )
+    # else:
+    #     # l.plot_solution(col = 'LogClose', method= 'basinhopping' )
+    #     l.plot_solution( method= 'basinhopping' )
+    #plt.plot(p.data_series[0], p.data_series[1])
+    #plt.gca().xaxis.set_major_formatter(matplotlib.ticker.StrMethodFormatter("{x:.2f}"))
+
+
+
+
 def run1( search = True):
     # Get hourly data
     
@@ -115,3 +193,4 @@ def run1( search = True):
     #     # Reset data size
     #     self.data_size = data_size        
     #     return dataSeries
+

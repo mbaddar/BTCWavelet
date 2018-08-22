@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 import matplotlib.cm
-from scipy.optimize import fmin_tnc, least_squares, minimize, basinhopping, differential_evolution
+from scipy.optimize import minimize, basinhopping, differential_evolution
 import random
 import pandas as pd
 from pandas_datareader import data as pdr
@@ -34,7 +34,6 @@ def shift_to_log(file = "message.log" ):
 
 def next_power_of_2(x):  
     return 1 if x == 0 else 2**(x - 1).bit_length()
-
 
 class Pipeline:
     @property
@@ -448,12 +447,12 @@ class Nonlinear_Fit:
             def __call__(self, x):
                 #s = self.stepsize
                 # randoms = np.random.random_sample((3,))
-                x[0] += 20.*randoms[0] -10 # (-10, 10) #tc
-                x[1] += 1.6*randoms[1] -.8  #(-.8, .8) #m
-                x[2] += 22.*randoms[2] -11 #(-11, 11 ) #w
-                # x[0] += np.random.uniform(-10,10)
-                # x[1] += np.random.uniform(-.8,.8)
-                # x[2] += np.random.uniform(-11,11) 
+                # x[0] += 20.*randoms[0] -10 # (-10, 10) #tc
+                # x[1] += 1.6*randoms[1] -.8  #(-.8, .8) #m
+                # x[2] += 22.*randoms[2] -11 #(-11, 11 ) #w
+                x[0] += np.random.uniform(-3,3)
+                x[1] += np.random.uniform(-.1,.1)
+                x[2] += np.random.uniform(-1,1) #w 
                 return x    
 
         limits = ( tc, m, w, (time_head,time_head) )
@@ -657,9 +656,9 @@ def describe( data):
     df = DataFrame( data )
     print(df.describe())
 
-
-def omxs30():
-    date1, date2 = "1996-5-20 00:00:00", "1998-8-18 00:00:00"
+def omxs30( omega = 13):
+    date1, date2 = "1998-1-20 00:00:00", "1998-8-20 00:00:00"
+    # date1, date2 = "1996-5-20 00:00:00", "1998-8-20 00:00:00"
     p = Pipeline( date1, date2, data_source='OMXS30', hourly=False, count=0)
     data_series = p.data_series
     # plt.plot( data_series[0], data_series[1], label='Data' )
@@ -668,24 +667,22 @@ def omxs30():
     # plt.title("OMX3 Crash")
     print("Actual crash: ", to_year_from_fraction(1998.686) )
     crashes = []
-    dt = []
-    for _ in np.arange(1):
-        for day in np.arange(1, 30): #Advance the start date and fit
-            ds = [ data_series[0][day:], data_series[1][day:] ]
-            l = Nonlinear_Fit ( ds)
-            #crash = l.plot_solution( method= 'differential_evolution', niter=5 )
-            crash = l.plot_solution2( method= 'basinhopping', niter=30 )
-            crashes.append( crash)
-            dt.append( data_series[0][day:].size )  
+    for _ in np.arange(500):
+        day_from = np.random.randint(0,60) # trim random days from the start
+        day_to = np.random.randint(1,10) #trim random days from the end. At least 1
+        ds = [ data_series[0][ day_from:-day_to ], data_series[1][ day_from:-day_to ] ]
+        l = Nonlinear_Fit ( ds)
+        crash = l.plot_solution2( method= 'basinhopping', niter=30, omega = omega )
+        crashes.append( ( crash, data_series[0][day_from:-day_to].size) ) 
 
-    scatter_plot(crashes, dt)
+    scatter_plot( *zip( *crashes) )
     plt.title("Crash times Cluster. Actual crash on %s" % str_from_date( to_year_from_fraction(1998.686) ) )
     plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
     plt.show()
 
     # plt.close('all')
     describe( crashes )
-    hist( crashes )
+    # hist( crashes )
     print("Actual crash: ", to_year_from_fraction(1998.686) )
     plt.show()
 
@@ -750,6 +747,37 @@ def synthetic_trial():
     # plt.show()
     # 
 
+def Btc_sq_wavelet_plot( date2 = "2017-12-31 00:00:00", hourly = False , count = 256):
+
+    p = Pipeline(date1= None, date2= date2, data_source='BTC', hourly= hourly, count= -count)#4096
+    data_series = p.data_wrapper.get_data_series( col='Close')
+    w = Wavelet_Wrapper( data_series[1].tolist(), padding=False )
+    coeffs = w.wavelet_decomposition( ) #Defaults to 8 levels only
+    for additional in np.arange(8, int(np.log2( count)) ):
+        print("additional: ", additional )
+        coeffs.append( w.get_decomposition_level( additional) )
+    print("wavelet coeff len: " , len(coeffs))
+    for d in range( len(coeffs) ):
+        plt.close('all')
+        plt.plot( np.power(coeffs[d],2) )
+        plt.title( "%s Squared Coeff[%d]"% ( "hourly" if hourly else "daily", d) )
+        #plt.show()
+        plt.savefig("./figures/report/wavelets/Wavelets-%s-%s-%s-%2d.png"%
+                    (int(time.time()), "hourly" if hourly else "daily","square_coeef-",d ) )
+
+def btc_plot(date1='2017-9-1 00:00:00', date2 = "2017-12-31 00:00:00", hourly = False, count = 0):
+    p = Pipeline(date1= date1 , date2= date2, data_source='BTC', hourly= hourly, count=count ) #8192,13 levels
+    # p = Pipeline(date1= None, date2= date2, data_source='BTC', hourly= False, count= ) #8192,13 levels
+    data_series = p.data_wrapper.get_data_series( col='Close')
+    #data_series = p.data_series
+    plt.plot( data_series[0], data_series[1] )
+    plt.title("BTC %s price data - June-December 2017" % ("hourly" if hourly else "daily") )
+    plt.xlabel("t" )
+    plt.ylabel("P")
+    plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
+    describe( p.data_wrapper.data['Close'] )
+    plt.show()
+
 def Btc_trial(  date1 = "2017-5-1 00:00:00", date2 = "2017-11-15 00:00:00", hourly = True, 
     wavelet = False, trials = 1000 , level=1, omega = 13 ):
     count = 0
@@ -793,6 +821,7 @@ def Btc_trial(  date1 = "2017-5-1 00:00:00", date2 = "2017-11-15 00:00:00", hour
     plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
     plt.show()
 
+
 if __name__ == "__main__":
     #synthetic_trial()
     # synthetic_stats( 100)
@@ -800,82 +829,14 @@ if __name__ == "__main__":
     np.random.seed( rnd )
     rnd = struct.unpack("<I", os.urandom( 4 ))[0]
     random.seed( rnd )
-    date1, date2 = "2016-2-1 00:00:00", "2017-11-25 00:00:00"
+    #date1, date2 = "2016-2-1 00:00:00", "2017-11-25 00:00:00"
+    # date1, date2 = "2017-5-1 00:00:00", "2017-11-25 00:00:00"
 
-    Btc_trial( date1, date2 ,hourly = False , wavelet= False, trials = 100, level=1, omega= 8 )
-    #omxs30()
+    # Btc_trial( date1, date2 ,hourly = False , wavelet= False, trials = 100, level=1, omega= 13 )#8
+    # omxs30(omega = 13)
+    #Btc_sq_wavelet_plot(hourly = False, count = 256)
 
-if __name__ == "__main__1":
-    # start date 17/9/2013
-    # plt.show(block=True)
-    wavelet_flag = False
-    date1, date2 = "2017-1-15 00:00:00", "2017-12-1 00:00:00"
-    #p = Pipeline(date1, date2, data_source='BTC', count=32768)
-    # p = Pipeline(date1, date2, data_source='BTC', hourly=False, count=-16384)
-    p = Pipeline( date1, date2, data_source='BTC', hourly=False, count=0)
-    p.run(level=1)
-    # log_file = shift_to_log( "message-%d.log" %int(time.time()) )
-    crashes = []
-    #wavelet recon
-    # data_series = p.data_wrapper.get_data_series( p.data_wrapper.data , col='Recon')
-    data_series = p.data_series
-    plt.plot( data_series[0], data_series[1], label='Data' )
-    l = Nonlinear_Fit ( data_series)
-    l.plot_solution2( method= 'basinhopping', niter=20)
-    plt.xlabel("t")
-    plt.ylabel("Ln P")
-    plt.title("Reduced Solution")
-    plt.show()
-    # x = solution.x
-    #A= 9.554, B=-2.931, Crash=29.42 m=0.75 ,c1=0.16 ,w=12.74 ,c2=-0.20.
-        
-    # plt.plot( data_series[0], data_series[1], label='Tc=29 days' )
-    # x= [ 9.554, -2.931, 9.42 ,0.75 ,0.16 ,12.74 ,-0.20, data_series[0][data_series[0].size-1] ]
-    # data_series[1] = lpplc1(data_series[0], x)
-    # plt.plot( data_series[0], data_series[1], label='Tc=9 days' )
-    # x= [ 9.554, -2.931, 59.42 ,0.75 ,0.16 ,12.74 ,-0.20, data_series[0][data_series[0].size-1] ]
-    # data_series[1] = lpplc1(data_series[0], x)
-    # plt.plot( data_series[0], data_series[1], label='Tc=59 days' )
-    # plt.gca().xaxis.set_major_formatter( matplotlib.ticker.FuncFormatter(format_func) )
-    # plt.xlabel("t")
-    # plt.ylabel("Ln P")
-    # plt.title("LPPL fit of differenet Tc")
-    # plt.legend()
-    # plt.show()
-    # for day in 24*np.arange(1, 76, 5): #Advance the start date and fit
-    # for day in np.arange(1, 20): #Advance the start date and fit
-    #     ds = [ data_series[0][day:], data_series[1][day:] ]
-    #     l = Nonlinear_Fit ( ds)
-    #     # crash = l.plot_solution( method= 'differential_evolution', niter=5 )
-    #     crash = l.plot_solution( method= 'basinhopping', niter=30 )
-    #     crashes.append( ( crash, data_series[0][day:].size) ) 
+    #Btc_sq_wavelet_plot(hourly = True, count = 4096)
+    btc_plot(hourly=False)
 
-    # for crash ,dt in crashes:
-    #     print("Crash in %.2f days, for period of %d" % (crash, dt))
-    
-    # plt.show()
-    # # plt.close('all')
-    # plt.scatter( *zip( *crashes) )
-    # plt.gca().set_xlabel('tc-t2')
-    # plt.gca().set_ylabel('dt = t2-t1')
-
-    # clusters, labels = cluster(points, 4)
-    # plt.scatter( *zip( *clusters) )
-    # plt.show(block=True)
-    # print( metrics.silhouette_score(points, labels) )
-    # print ( "Clusters: ", clusters )
-
-    # plt.title("BTC LPPL Fit - 10 Different Periods")
-    # log_file.close()
-    sys.stdout = old_stdout
-    # plt.show()
-
-    # if wavelet_flag:
-    #     l.wavelet_recon()
-    #     l.plot_solution( method= 'basinhopping' )
-    # else:
-    #     # l.plot_solution(col = 'LogClose', method= 'basinhopping' )
-    #     l.plot_solution( method= 'basinhopping' )
-    #plt.plot(p.data_series[0], p.data_series[1])
-    #plt.gca().xaxis.set_major_formatter(matplotlib.ticker.StrMethodFormatter("{x:.2f}"))
-
+    #btc_plot(hourly=True)

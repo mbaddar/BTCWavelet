@@ -89,12 +89,13 @@ class Wavelet_Wrapper:
         coeffs = wavedec( self.data , self.wavelet_name , level=None )
         self.__coeffs = coeffs
         return coeffs
+
     def get_decomposition_level (self, level = 1):
         """
         Detail level
         """
         return downcoef('d', self.data, self.wavelet_name, mode='smooth', level = level )
-    def plot_coefficients( self, wavelet_name, coeffs ):
+    def plot_coefficients( self, coeffs,  wavelet_name='db24' ):
 
         #Construct a DataFrame from the coeffs
         coeff_dict = dict( ("Coefficient (%d)"% d, coeffs[d].tolist() ) 
