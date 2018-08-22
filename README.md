@@ -43,8 +43,7 @@ All the experiments starting points are in [lppl_ga.py](../master/code/lppl_ga.p
 |---|---|
 | BaseCrawler  |  Basic http, requesting API endpoint functions |
 |Crawler | Cryptocompare crawler. The Bitcoin hourly data source.  |
-| Data_Wrapper  | Reads local Bitcoin and other financial assets data and returns them on a
-dataframe with a standard column formatting  |
+| Data_Wrapper  | Reads local Bitcoin and other financial assets data and returns them on a dataframe with a standard column formatting |
 |  Epsilon_Drawdown  | Implementation of (Gerlach, et al., 2018) Epsilon Drwadown algorithm  |
 | Nonlinear_Fit   | Implementation of LPPL non-linear optimization. The main algorithm used across experiments is Basin Hopping.|
 | Pipeline   | The model pipeline from crawling to bubble prediction. Incomplete  |
