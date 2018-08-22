@@ -12,6 +12,7 @@
 
 [2. Running the code:](#2) 
 
+[3. Code Files:](#2)
 
 ### 1. Creating Anaconda Environment: <a  id="1"></a> 
 
@@ -24,3 +25,12 @@ For more information on how conda environments work refer to [Conda user guide: 
 ### 2. Running the code: <a  id="2"></a>  
 
 All the experiments starting points are in [lppl_ga.py](../master/code/lppl_ga.py). The code will default to run a 1000 Bitcoin trials on hourly data with DWT enabled. I might create a command-line interface for the different experiments in the future. 
+
+### 3. Code Files: <a  id="3"></a>
+
+| File Name  |  Contained Classes |
+|---|---|
+|Lppl_ga.py|Pipeline, Nonlinear_Fit|
+|Epsilon.py|Data_Wrapper, Epsilon_Drawdown|
+|Decomposition.py|Wavelet_Wrapper|
+|Crawler.py|BaseCrawler, Crawler, … [exchange specific crawlers were not used]|
